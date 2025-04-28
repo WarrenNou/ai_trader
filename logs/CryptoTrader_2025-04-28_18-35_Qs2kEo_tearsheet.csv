@@ -1,0 +1,69 @@
+Metric,BTC/USD,Strategy
+Risk-Free Rate,4.4%,4.4%
+Time in Market,100.0%,100.0%
+,,
+Total Return,153%,212%
+CAGR% (Annual Return),136.08%,186.24%
+,,
+Sharpe,1.85,2.33
+RoMaD,5.2,8.93
+Corr to Benchmark,1.0,0.24
+Prob. Sharpe Ratio,87.64%,95.2%
+Smart Sharpe,1.7,2.15
+Sortino,2.97,3.8
+Smart Sortino,2.74,3.51
+Sortino/√2,2.1,2.69
+Smart Sortino/√2,1.94,2.48
+Omega,1.47,1.47
+,,
+Max Drawdown,-26.18%,-20.85%
+Longest DD Days,234,59
+Volatility (ann.),51.17%,48.24%
+R^2,0.06,0.06
+Information Ratio,0.02,0.02
+Calmar,5.2,8.93
+Skew,0.45,0.44
+Kurtosis,2.22,7.31
+,,
+Expected Daily%,0.24%,0.29%
+Expected Monthly%,6.87%,8.47%
+Expected Yearly%,59.17%,76.66%
+Daily Value-at-Risk,-4.13%,-3.83%
+Expected Shortfall (cVaR),-4.13%,-3.83%
+,,
+MTD,0.0%,-1.3%
+3M,6.42%,24.23%
+6M,19.25%,49.06%
+YTD,57.29%,115.38%
+1Y,96.07%,152.14%
+3Y (ann.),136.08%,186.24%
+5Y (ann.),136.08%,186.24%
+10Y (ann.),136.08%,186.24%
+All-time (ann.),136.08%,186.24%
+,,
+Best Day,12.01%,15.57%
+Worst Day,-8.42%,-13.62%
+Best Month,44.94%,32.94%
+Worst Month,-16.37%,-14.48%
+Best Year,61.08%,115.38%
+Worst Year,57.29%,44.9%
+,,
+Avg. Drawdown,-4.71%,-4.15%
+Avg. Drawdown Days,18,9
+Recovery Factor,4.09,6.07
+Ulcer Index,0.11,0.07
+Serenity Index,1.27,3.56
+,,
+Avg. Up Month,16.62%,15.91%
+Avg. Down Month,-7.3%,-5.6%
+Win Days,209.53,213.54
+Loss Days,186.47,182.46
+Win Days%,52.91%,53.92%
+Win Month%,69.23%,71.43%
+Win Quarter%,60.0%,100.0%
+Win Year%,100.0%,100.0%
+,,
+Beta,-,0.23
+Alpha,-,0.94
+Correlation,-,24.34%
+Treynor Ratio,-,904.93%

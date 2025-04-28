@@ -8,7 +8,7 @@ load_dotenv()
 
 # result_key_for_type="news"
 search = GoogleSerperAPIWrapper(k=15, type="news")
-llm = OllamaLLM(model="llama3.2", format="json")
+llm = OllamaLLM(model="deepseek-r1:7b", format="json")
 
 
 def get_web_deets(

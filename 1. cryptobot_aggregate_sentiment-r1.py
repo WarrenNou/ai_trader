@@ -55,7 +55,7 @@ class CryptoTrader(Strategy):
         
 
         stream = chat(
-            model="deepseek-r1:14b",
+            model="deepseek-r1:7b",  # Change to a model you have, like "llama3" or "mistral"
             messages=[{"role": "user", "content": prompt_template(news)}],
             format=Response.model_json_schema(),
         )
@@ -102,8 +102,8 @@ class CryptoTrader(Strategy):
 
 
 if __name__ == "__main__":
-    start_date = datetime(2023, 10, 1)
-    end_date = datetime(2024, 11, 1)
+    start_date = datetime(2025, 1, 1)
+    end_date = datetime.now()
     exchange_id = "kraken"
     kwargs = {
         "exchange_id": exchange_id,

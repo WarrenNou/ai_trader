@@ -9,7 +9,7 @@ from langchain_ollama import OllamaLLM
 import json
 from llmprompts import get_web_deets, prompt_template, direct_recommendation
 
-llm = OllamaLLM(model="openhermes", format="json")
+llm = OllamaLLM(model="deepseek-r1:7b", format="json")
 
 
 class MLTrader(Strategy):
