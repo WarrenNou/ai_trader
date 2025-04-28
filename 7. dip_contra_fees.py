@@ -1,6 +1,6 @@
 # Add Trading fee to imports
 from lumibot.entities import Asset, TradingFee
-from lumibot.backtesting import CcxtBacktesting
+from lumibot.backtesting import CcxtBacktesting, YahooDataBacktesting
 from lumibot.strategies.strategy import Strategy
 from datetime import datetime
 from timedelta import Timedelta
@@ -9,8 +9,8 @@ from finbert_utils import estimate_sentiment
 from colorama import Fore, init
 
 
-API_KEY = "PKDG6R9WO050UY4ZZQ4H"
-API_SECRET = "z5B1q7WtL8gWeyn1lavuB8F36TBsFdXYFPfrARKI"
+API_KEY = "PK71L3FGRWSNX7OHFWP0"
+API_SECRET = "WsDYxovs8GbTcrA7PYelukQwDDqZaDQU0wjIlGwy"
 BASE_URL = "https://paper-api.alpaca.markets/v2"
 
 ALPACA_CREDS = {"API_KEY": API_KEY, "API_SECRET": API_SECRET, "PAPER": True}
@@ -60,45 +60,59 @@ class MLTrader(Strategy):
         probability, sentiment = self.get_sentiment()
 
         if last_price != None:
-            if cash > last_price:
-                print(Fore.YELLOW + f"{probability}, {sentiment}" + Fore.RESET)
-                if sentiment == "negative" and probability > 0.99:
+            print(Fore.YELLOW + f"{probability}, {sentiment}" + Fore.RESET)
+            
+            # Buy on negative sentiment (contrarian)
+            if sentiment == "negative" and probability > 0.95 and cash > last_price:
+                order = self.create_order(
+                    self.coin,
+                    quantity,
+                    "buy",
+                    type="bracket",
+                    take_profit_price=last_price * 1.5,
+                    stop_loss_price=last_price * 0.7,
+                    quote=Asset(symbol="USD", asset_type="crypto"),
+                )
+                print(Fore.LIGHTMAGENTA_EX + f"BUY ORDER: {order}" + Fore.RESET)
+                self.submit_order(order)
+                self.last_trade = "buy"
+                
+            # Sell on positive sentiment (contrarian)
+            elif sentiment == "positive" and probability > 0.95 and self.last_trade == "buy":
+                position = self.get_position(Asset(symbol=self.coin, asset_type="crypto"))
+                if position is not None and position.quantity > 0:
                     order = self.create_order(
                         self.coin,
-                        quantity,
-                        "buy",
-                        type="bracket",
-                        take_profit_price=last_price * 1.5,
-                        stop_loss_price=last_price * 0.7,
+                        position.quantity,
+                        "sell",
                         quote=Asset(symbol="USD", asset_type="crypto"),
                     )
-                    print(Fore.LIGHTMAGENTA_EX + str(order) + Fore.RESET)
+                    print(Fore.LIGHTCYAN_EX + f"SELL ORDER: {order}" + Fore.RESET)
                     self.submit_order(order)
-                    self.last_trade = "buy"
+                    self.last_trade = "sell"
 
 
 if __name__ == "__main__":
+    from lumibot.backtesting import YahooDataBacktesting
+    
     start_date = datetime(2024, 10, 15)
-    end_date = datetime(2024, 11, 1)
-    exchange_id = "kraken"
-    kwargs = {
-        "exchange_id": exchange_id,
-    }
-    CcxtBacktesting.MIN_TIMESTEP = "day"
-    coin = "XRP"
-    coin_name = "ripple"
+    end_date = datetime(2025, 4, 1)
+    
+    coin = "BTC"
+    coin_name = "bitcoin"
+    
+    # Use Yahoo Finance for backtesting
     results, strat_obj = MLTrader.run_backtest(
-        CcxtBacktesting,
+        YahooDataBacktesting,
         start_date,
         end_date,
-        benchmark_asset=f"{coin}/USD",
+        benchmark_asset="BTC-USD", 
         quote_asset=Asset(symbol="USD", asset_type="crypto"),
-        # Add in trading fees based on Kraken sched - https://www.kraken.com/features/fee-schedule
-        buy_trading_fees=[TradingFee(percent_fee=0.002)],
-        sell_trading_fees=[TradingFee(percent_fee=0.0035)],
+        buy_trading_fees=[TradingFee(percent_fee=0.001)],
+        sell_trading_fees=[TradingFee(percent_fee=0.001)],
         parameters={
             "cash_at_risk": 0.50,
             "coin": coin,
-        },
-        **kwargs,
+            "coin_name": coin_name,
+        }
     )
