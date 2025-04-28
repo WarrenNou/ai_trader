@@ -16,7 +16,7 @@ class Response(BaseModel):
 
 class StockTrader(Strategy):
     def initialize(self, cash_at_risk: float = 0.2, ticker: str = "AAPL", company_name: str = "Apple"):
-        self.set_market("us_equities")
+        self.set_market("NYSE")  # Changed from "us_equities" to "NYSE"
         self.sleeptime = "1D"
         self.last_trade = None
         self.cash_at_risk = cash_at_risk
@@ -41,28 +41,57 @@ class StockTrader(Strategy):
         return today.strftime("%Y-%m-%d"), day_prior.strftime("%Y-%m-%d")
 
     def get_sentiment(self):
-        today, day_prior = self.get_dates()
-        news = get_web_deets(day_prior, today, coin_name=self.company_name)
-        print(Fore.YELLOW + news + Fore.RESET)
-
-        result = self.llm.invoke(prompt_template(news))
-        parsed_result = json.loads(result)
-        print(Fore.LIGHTBLUE_EX + str(parsed_result) + Fore.RESET)
-        return parsed_result
+        """Get sentiment from news data"""
+        # Get dates for news retrieval
+        today_date, prior_date = self.get_dates()
+        
+        # Get news data for the company with date parameters
+        news = get_web_deets(prior_date, today_date, self.company_name)
+        
+        # Get the prompt from prompt_template function - pass only the news data
+        prompt = prompt_template(news)
+        
+        try:
+            # Get sentiment from LLM
+            response = self.llm.invoke(prompt)
+            
+            # Try to parse the response as JSON
+            try:
+                # If response is already a dict, use it directly
+                if isinstance(response, dict):
+                    parsed_response = response
+                else:
+                    # Otherwise try to parse it as JSON string
+                    import json
+                    parsed_response = json.loads(response)
+                
+                # Ensure the required keys exist
+                if "sentiment" not in parsed_response or "score" not in parsed_response:
+                    # Default to neutral if missing keys
+                    return {"sentiment": "neutral", "score": 0.5}
+                
+                return parsed_response
+                
+            except Exception as e:
+                print(f"Error parsing LLM response: {e}")
+                print(f"Raw response: {response}")
+                # Return neutral sentiment as fallback
+                return {"sentiment": "neutral", "score": 0.5}
+                
+        except Exception as e:
+            print(f"Error getting sentiment: {e}")
+            # Return neutral sentiment as fallback
+            return {"sentiment": "neutral", "score": 0.5}
 
     def on_trading_iteration(self):
-        # Only trade during market hours
-        if not self.is_market_open():
-            print(Fore.RED + "Market closed, skipping trading iteration" + Fore.RESET)
-            return
-
+        # Remove market open check as it's not available
         cash, last_price, quantity = self.position_sizing()
         
         # Skip if quantity is too small
         if quantity < 1:
             print(Fore.RED + f"Calculated quantity ({quantity}) too small to trade" + Fore.RESET)
             return
-            
+        
         # Get News, Sentiment and Probability
         news_data = self.get_sentiment()
         sentiment = news_data["sentiment"]

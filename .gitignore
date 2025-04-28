@@ -8,3 +8,18 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment variables
+.env
+.env.*
+*.env
+
+# API keys and secrets
+*_credentials.json
+credentials.json
+*_key.json
+*_secret.json
+
+# Local configuration
+config.local.yaml
+config.local.yml
