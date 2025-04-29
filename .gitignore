@@ -8,6 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+venv/
+env/
 
 # Environment variables
 .env
@@ -23,3 +25,20 @@ credentials.json
 # Local configuration
 config.local.yaml
 config.local.yml
+
+# Logs and data
+logs/
+*.log
+*.csv
+*.sqlite
+*.db
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
