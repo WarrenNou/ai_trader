@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trading Bot Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { padding-top: 20px; }
+        .card { margin-bottom: 20px; }
+        #log-container { 
+            height: 300px; 
+            overflow-y: auto; 
+            background-color: #f8f9fa; 
+            padding: 10px;
+            font-family: monospace;
+        }
+        .log-entry { margin-bottom: 5px; }
+        .positive { color: green; }
+        .negative { color: red; }
+        .neutral { color: blue; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">Trading Bot Dashboard</h1>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Bot Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Status: <span id="bot-status">Idle</span></p>
+                        <p>Last Started: <span id="last-started">Never</span></p>
+                        <div class="btn-group" role="group">
+                            <button id="start-bot" class="btn btn-primary">Start Bot</button>
+                            <button id="pause-bot" class="btn btn-warning">Pause Bot</button>
+                            <button id="stop-bot" class="btn btn-danger">Stop Bot</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Portfolio Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="portfolio-summary">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5>Recent Trades</h5>
+            </div>
+            <div class="card-body">
+                <div id="recent-trades">No trades yet</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5>Bot Logs</h5>
+            </div>
+            <div class="card-body">
+                <div id="log-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Start bot function
+        document.getElementById('start-bot').addEventListener('click', function() {
+            fetch('/start')
+                .then(response => response.text())
+                .then(data => {
+                    addLogEntry(data);
+                    updateStatus();
+                });
+        });
+
+        // Pause bot function
+        document.getElementById('pause-bot').addEventListener('click', function() {
+            fetch('/pause')
+                .then(response => response.text())
+                .then(data => {
+                    addLogEntry(data);
+                    updateStatus();
+                });
+        });
+
+        // Stop bot function
+        document.getElementById('stop-bot').addEventListener('click', function() {
+            fetch('/stop')
+                .then(response => response.text())
+                .then(data => {
+                    addLogEntry(data);
+                    updateStatus();
+                });
+        });
+
+        // Function to add log entry
+        function addLogEntry(message, type = '') {
+            const logContainer = document.getElementById('log-container');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Update UI based on bot status
+        function updateButtonStates(status) {
+            const startBtn = document.getElementById('start-bot');
+            const pauseBtn = document.getElementById('pause-bot');
+            const stopBtn = document.getElementById('stop-bot');
+            
+            if (status === 'Running') {
+                startBtn.disabled = true;
+                pauseBtn.disabled = false;
+                stopBtn.disabled = false;
+            } else if (status === 'Paused') {
+                startBtn.disabled = false;
+                pauseBtn.disabled = true;
+                stopBtn.disabled = false;
+                startBtn.textContent = 'Resume Bot';
+            } else { // Stopped or Idle
+                startBtn.disabled = false;
+                pauseBtn.disabled = true;
+                stopBtn.disabled = true;
+                startBtn.textContent = 'Start Bot';
+            }
+        }
+
+        // Fetch bot status periodically
+        function updateStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('bot-status').textContent = data.status;
+                    if (data.last_started) {
+                        document.getElementById('last-started').textContent = new Date(data.last_started).toLocaleString();
+                    }
+                    
+                    // Update button states based on status
+                    updateButtonStates(data.status);
+                    
+                    // Update portfolio summary
+                    if (data.portfolio) {
+                        let portfolioHtml = `
+                            <p>Cash: $${data.portfolio.cash.toFixed(2)}</p>
+                            <p>Equity: $${data.portfolio.equity.toFixed(2)}</p>
+                            <p>Total Value: $${data.portfolio.total_value.toFixed(2)}</p>
+                        `;
+                        document.getElementById('portfolio-summary').innerHTML = portfolioHtml;
+                    }
+                    
+                    // Update trades
+                    if (data.trades && data.trades.length > 0) {
+                        let tradesHtml = '<table class="table table-striped">';
+                        tradesHtml += '<thead><tr><th>Time</th><th>Symbol</th><th>Action</th><th>Quantity</th><th>Price</th><th>Sentiment</th></tr></thead>';
+                        tradesHtml += '<tbody>';
+                        
+                        data.trades.forEach(trade => {
+                            tradesHtml += `<tr>
+                                <td>${new Date(trade.time).toLocaleString()}</td>
+                                <td>${trade.symbol}</td>
+                                <td>${trade.action}</td>
+                                <td>${trade.quantity}</td>
+                                <td>$${trade.price.toFixed(2)}</td>
+                                <td class="${trade.sentiment}">${trade.sentiment}</td>
+                            </tr>`;
+                        });
+                        
+                        tradesHtml += '</tbody></table>';
+                        document.getElementById('recent-trades').innerHTML = tradesHtml;
+                    }
+                    
+                    // Update logs
+                    if (data.logs && data.logs.length > 0) {
+                        data.logs.forEach(log => {
+                            if (!document.querySelector(`.log-entry:contains("${log.message}")`)) {
+                                addLogEntry(log.message, log.type);
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching status:', error);
+                });
+        }
+
+        // Update status every 5 seconds
+        setInterval(updateStatus, 5000);
+        updateStatus(); // Initial update
+    </script>
+</body>
+</html>

@@ -1,1 +1,1 @@
-web: python server.py
+web: ENVIRONMENT=production python server.py

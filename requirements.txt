@@ -4,3 +4,6 @@ colorama>=0.4.6
 timedelta>=2020.12.3
 transformers>=4.51.3
 torch>=2.7.0
+flask>=3.0.0
+waitress>=2.1.2
+# Add your other dependencies here
