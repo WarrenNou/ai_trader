@@ -212,7 +212,7 @@ if __name__ == "__main__":
         benchmark_asset="SPY",
         parameters={
             "stocks_config": stocks_config,
-            "cash_at_risk": 0.25
+            "cash_at_risk": 1
         }
     )
     
