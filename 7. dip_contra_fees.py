@@ -23,7 +23,7 @@ class MLTrader(Strategy):
         self, coin: str = "LTC", coin_name: str = "litecoin", cash_at_risk: float = 0.2
     ):
         self.set_market("24/7")
-        self.sleeptime = "1D"
+        self.sleeptime = "5H"
         self.last_trade = None
         self.cash_at_risk = cash_at_risk
         self.coin = coin
@@ -59,6 +59,25 @@ class MLTrader(Strategy):
     def on_trading_iteration(self):
         # Add this at the start of the method
         self.log_message(f"Starting trading iteration at {self.get_datetime()}")
+        
+        # Get portfolio data
+        cash = self.get_cash()
+        portfolio_value = self.portfolio_value
+        positions = self.get_positions()
+        equity_value = 0
+        
+        for position in positions:
+            equity_value += position.market_value
+        
+        # Write portfolio data to file for the server to read
+        with open("portfolio_data.json", "w") as f:
+            import json
+            json.dump({
+                "cash": cash,
+                "equity": equity_value,
+                "total_value": portfolio_value,
+                "timestamp": str(self.get_datetime())
+            }, f)
         
         cash, last_price, quantity = self.position_sizing()
         probability, sentiment = self.get_sentiment()

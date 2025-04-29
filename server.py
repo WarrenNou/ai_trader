@@ -76,17 +76,48 @@ def get_status():
     elif bot_paused:
         status = "Paused"
     
-    # Mock data for demonstration
+    # Get portfolio data from file
+    portfolio = {
+        "cash": 10000.00,
+        "equity": 5000.00,
+        "total_value": 15000.00
+    }
+    
+    try:
+        if os.path.exists("portfolio_data.json"):
+            with open("portfolio_data.json", "r") as f:
+                import json
+                portfolio_data = json.load(f)
+                portfolio = {
+                    "cash": portfolio_data.get("cash", 10000.00),
+                    "equity": portfolio_data.get("equity", 5000.00),
+                    "total_value": portfolio_data.get("total_value", 15000.00)
+                }
+    except Exception as e:
+        print(f"Error reading portfolio data: {str(e)}")
+    
+    # Get logs as before...
+    logs = []
+    try:
+        if os.path.exists("bot_logs.txt"):
+            with open("bot_logs.txt", "r") as f:
+                log_lines = f.readlines()[-20:]
+                for line in log_lines:
+                    log_type = "neutral"
+                    if "BUY" in line or "positive" in line:
+                        log_type = "positive"
+                    elif "SELL" in line or "negative" in line:
+                        log_type = "negative"
+                    logs.append({"message": line.strip(), "type": log_type})
+    except Exception as e:
+        logs.append({"message": f"Error reading logs: {str(e)}", "type": "negative"})
+    
     return jsonify({
         "status": status,
         "last_started": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "portfolio": {
-            "cash": 10000.00,
-            "equity": 5000.00,
-            "total_value": 15000.00
-        },
-        "trades": [],
-        "logs": []
+        "portfolio": portfolio,
+        "trades": [],  # This will be updated in a future enhancement
+        "logs": logs
     })
 
 def run_trading_bot():
@@ -94,15 +125,25 @@ def run_trading_bot():
     
     bot_running = True
     
+    # Create a log file for the bot
+    log_file = open("bot_logs.txt", "a")
+    
     while bot_running:
         if not bot_paused:
             # Use a lightweight approach to run the trading script
-            bot_process = subprocess.Popen(["python", "7. dip_contra_fees.py"])
+            # Redirect output to our log file
+            bot_process = subprocess.Popen(
+                ["python", "7. dip_contra_fees.py"],
+                stdout=log_file,
+                stderr=log_file,
+                universal_newlines=True
+            )
             bot_process.wait()
         
         # Sleep to prevent CPU overuse if paused
         time.sleep(1)
     
+    log_file.close()
     bot_running = False
 
 # Start the bot automatically when the server starts
