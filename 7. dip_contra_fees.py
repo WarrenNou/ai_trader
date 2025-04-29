@@ -106,52 +106,51 @@ class MLTrader(Strategy):
             quote = Asset(symbol="USD", asset_type="crypto")
             
             try:
-                # The order of parameters matters! Asset needs to be first
+                # Simplified approach for getting historical prices
                 historical_data = self.get_historical_prices(
-                    asset,          # Asset object must be first parameter
-                    4,              # Number of bars (as integer)
-                    quote=quote     # Quote currency
+                    self.coin,  # Pass symbol string directly
+                    4,          # Number of bars
+                    resolution="1day",  # Add explicit resolution parameter
+                    quote="USD"  # Quote currency
                 )
                 
-                # Check if we have enough data
-                if historical_data is not None and len(historical_data) > 1:
-                    # Sort by date to ensure proper ordering (newest data first by default)
+                # Continue processing if data is available
+                if historical_data is not None and len(historical_data) >= 2:  # Need at least 2 bars for trend
+                    # Sort by date, oldest first
                     sorted_data = sorted(historical_data, key=lambda x: x.timestamp)
                     
-                    # Get first and last price to determine trend
-                    oldest_price = sorted_data[0].close if len(sorted_data) > 0 else None
-                    newest_price = sorted_data[-1].close if len(sorted_data) > 0 else None
+                    # Calculate price change
+                    oldest_price = sorted_data[0].close
+                    newest_price = sorted_data[-1].close
+                    price_change = (newest_price - oldest_price) / oldest_price
                     
-                    # Make trading decisions if we have prices
-                    if oldest_price is not None and newest_price is not None:
-                        price_change = (newest_price - oldest_price) / oldest_price
-                        
-                        # If price is trending up at least 5% and we don't have a position, buy
-                        if price_change > 0.05 and (position is None or position.quantity == 0):
-                            order = self.create_order(
-                                self.coin,
-                                quantity * 0.5,  # Half position size for trend following
-                                "buy",
-                                type="bracket",
-                                take_profit_price=last_price * 1.3,
-                                stop_loss_price=last_price * 0.9,
-                                quote=Asset(symbol="USD", asset_type="crypto"),
-                            )
-                            print(Fore.LIGHTBLUE_EX + f"TREND BUY: {order}" + Fore.RESET)
-                            self.submit_order(order)
-                            self.last_trade = "buy"
-                        
-                        # If price is trending down at least 5% and we have a position, sell
-                        elif price_change < -0.05 and position is not None and position.quantity > 0:
-                            order = self.create_order(
-                                self.coin,
-                                position.quantity,
-                                "sell",
-                                quote=Asset(symbol="USD", asset_type="crypto"),
-                            )
-                            print(Fore.LIGHTRED_EX + f"TREND SELL: {order}" + Fore.RESET)
-                            self.submit_order(order)
-                            self.last_trade = "sell"
+                    # Trading decisions based on trend
+                    if price_change > 0.05 and (position is None or position.quantity == 0):
+                        # Buy order logic remains the same
+                        order = self.create_order(
+                            self.coin,
+                            quantity * 0.5,  # Half position size for trend following
+                            "buy",
+                            type="bracket",
+                            take_profit_price=last_price * 1.3,
+                            stop_loss_price=last_price * 0.9,
+                            quote=Asset(symbol="USD", asset_type="crypto"),
+                        )
+                        print(Fore.LIGHTBLUE_EX + f"TREND BUY: {order}" + Fore.RESET)
+                        self.submit_order(order)
+                        self.last_trade = "buy"
+                    
+                    # If price is trending down at least 5% and we have a position, sell
+                    elif price_change < -0.05 and position is not None and position.quantity > 0:
+                        order = self.create_order(
+                            self.coin,
+                            position.quantity,
+                            "sell",
+                            quote=Asset(symbol="USD", asset_type="crypto"),
+                        )
+                        print(Fore.LIGHTRED_EX + f"TREND SELL: {order}" + Fore.RESET)
+                        self.submit_order(order)
+                        self.last_trade = "sell"
             except Exception as e:
                 print(Fore.RED + f"Error getting historical data: {str(e)}" + Fore.RESET)
 
@@ -160,8 +159,8 @@ if __name__ == "__main__":
     from lumibot.backtesting import YahooDataBacktesting
     import numpy as np
     
-    start_date = datetime(2024, 10, 15)
-    end_date = datetime(2025, 4, 1)
+    start_date = datetime(2025, 1, 1)
+    end_date = datetime.now()
     
     coin = "BTC"
     coin_name = "bitcoin"
@@ -188,14 +187,31 @@ if __name__ == "__main__":
     
     # Print key performance metrics with error handling
     if results is not None and isinstance(results, dict):
-        print(f"Strategy Return: {results.get('return', 0):.2%}")
-        print(f"Strategy Sharpe: {results.get('sharpe', 0):.2f}")
-        print(f"Strategy Max Drawdown: {results.get('max_drawdown', 0):.2%}")
+        # Handle return
+        strat_return = results.get('return', 0)
+        if isinstance(strat_return, (int, float)):
+            print(f"Strategy Return: {strat_return:.2%}")
+        else:
+            print(f"Strategy Return: {strat_return}")
         
+        # Handle sharpe
+        sharpe = results.get('sharpe', 0)
+        if isinstance(sharpe, (int, float)):
+            print(f"Strategy Sharpe: {sharpe:.2f}")
+        else:
+            print(f"Strategy Sharpe: {sharpe}")
+        
+        # Handle max_drawdown
+        max_dd = results.get('max_drawdown', 0)
+        if isinstance(max_dd, (int, float)):
+            print(f"Strategy Max Drawdown: {max_dd:.2%}")
+        else:
+            print(f"Strategy Max Drawdown: {max_dd}")
+        
+        # Handle benchmark comparison
         benchmark_return = results.get('benchmark_return', 0)
-        strategy_return = results.get('return', 0)
-        if benchmark_return is not None and strategy_return is not None:
-            print(f"Strategy vs Benchmark: {strategy_return - benchmark_return:.2%}")
+        if isinstance(benchmark_return, (int, float)) and isinstance(strat_return, (int, float)):
+            print(f"Strategy vs Benchmark: {strat_return - benchmark_return:.2%}")
         else:
             print("Strategy vs Benchmark: Not available")
     else:
