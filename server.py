@@ -1,10 +1,12 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template
 import os
 import subprocess
 import threading
 import time
 
-app = Flask(__name__)
+# Create Flask app with explicit template folder
+app = Flask(__name__, 
+            template_folder=os.path.abspath('templates'))
 
 # Global variables to track bot state
 bot_process = None
@@ -13,7 +15,8 @@ bot_paused = False
 
 @app.route('/')
 def home():
-    return "Trading bot is running!"
+    # Serve the dashboard HTML template
+    return render_template('index.html')
 
 @app.route('/health')
 def health():
