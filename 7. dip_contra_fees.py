@@ -60,7 +60,7 @@ class MLTrader(Strategy):
         # Add this at the start of the method
         self.log_message(f"Starting trading iteration at {self.get_datetime()}")
         
-        # Get portfolio data
+        # Get accurate portfolio data directly from broker
         cash = self.get_cash()
         portfolio_value = self.portfolio_value
         positions = self.get_positions()
@@ -69,7 +69,7 @@ class MLTrader(Strategy):
         for position in positions:
             equity_value += position.market_value
         
-        # Write portfolio data to file for the server to read
+        # Write accurate portfolio data to file for the server to read
         with open("portfolio_data.json", "w") as f:
             import json
             json.dump({
@@ -78,6 +78,9 @@ class MLTrader(Strategy):
                 "total_value": portfolio_value,
                 "timestamp": str(self.get_datetime())
             }, f)
+        
+        # Log portfolio values for debugging
+        self.log_message(f"Portfolio update: Cash=${cash:.2f}, Equity=${equity_value:.2f}, Total=${portfolio_value:.2f}")
         
         cash, last_price, quantity = self.position_sizing()
         probability, sentiment = self.get_sentiment()

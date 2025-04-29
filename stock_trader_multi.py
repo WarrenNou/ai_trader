@@ -255,7 +255,7 @@ if __name__ == "__main__":
     logger.info("--- Backtest Finished ---")
     
     # For live trading (Keep this commented out unless running live)
-    """ 
+    
     from lumibot.brokers import Alpaca
     from lumibot.traders import Trader
     
@@ -278,4 +278,4 @@ if __name__ == "__main__":
     trader.add_strategy(strategy)
     logger.info("--- Starting Live Trading ---")
     trader.run_all()
-    """
+    

@@ -25,7 +25,8 @@ def estimate_sentiment(news):
         return probability, sentiment
     else:
         return 0, labels[-1]
-
+def SentimentAnalyzer():
+    return estimate_sentiment
 
 if __name__ == "__main__":
     tensor, sentiment = estimate_sentiment(

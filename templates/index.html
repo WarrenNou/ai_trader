@@ -105,7 +105,7 @@
         });
 
         // Function to add log entry
-        function addLogEntry(message, type = '') {
+        function addLogEntry(message, type = 'neutral') {
             const logContainer = document.getElementById('log-container');
             const entry = document.createElement('div');
             entry.className = 'log-entry ' + type;
@@ -124,6 +124,7 @@
                 startBtn.disabled = true;
                 pauseBtn.disabled = false;
                 stopBtn.disabled = false;
+                startBtn.textContent = 'Start Bot';
             } else if (status === 'Paused') {
                 startBtn.disabled = false;
                 pauseBtn.disabled = true;
@@ -183,10 +184,11 @@
                     
                     // Update logs
                     if (data.logs && data.logs.length > 0) {
+                        // Clear existing logs first to avoid duplicates
+                        document.getElementById('log-container').innerHTML = '';
+                        
                         data.logs.forEach(log => {
-                            if (!document.querySelector(`.log-entry:contains("${log.message}")`)) {
-                                addLogEntry(log.message, log.type);
-                            }
+                            addLogEntry(log.message, log.type);
                         });
                     }
                 })
