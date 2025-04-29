@@ -1,0 +1,9 @@
+*.ipynb
+*.pkl
+*.h5
+*.model
+logs/
+data/
+tests/
+__pycache__/
+*.pyc
