@@ -18,6 +18,7 @@
         .positive { color: green; }
         .negative { color: red; }
         .neutral { color: blue; }
+        .bot-controls { margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -28,15 +29,15 @@
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
-                        <h5>Bot Status</h5>
+                        <h5>Crypto Bot Status</h5>
                     </div>
                     <div class="card-body">
-                        <p>Status: <span id="bot-status">Idle</span></p>
-                        <p>Last Started: <span id="last-started">Never</span></p>
-                        <div class="btn-group" role="group">
-                            <button id="start-bot" class="btn btn-primary">Start Bot</button>
-                            <button id="pause-bot" class="btn btn-warning">Pause Bot</button>
-                            <button id="stop-bot" class="btn btn-danger">Stop Bot</button>
+                        <p>Status: <span id="crypto-status">Idle</span></p>
+                        <p>Last Started: <span id="crypto-last-started">Never</span></p>
+                        <div class="btn-group bot-controls" role="group">
+                            <button id="start-crypto-bot" class="btn btn-primary" onclick="controlBot('start', 'crypto')">Start Bot</button>
+                            <button id="pause-crypto-bot" class="btn btn-warning" onclick="controlBot('pause', 'crypto')" disabled>Pause Bot</button>
+                            <button id="stop-crypto-bot" class="btn btn-danger" onclick="controlBot('stop', 'crypto')" disabled>Stop Bot</button>
                         </div>
                     </div>
                 </div>
@@ -45,10 +46,33 @@
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
+                        <h5>Stock Bot Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Status: <span id="stock-status">Idle</span></p>
+                        <p>Last Started: <span id="stock-last-started">Never</span></p>
+                        <div class="btn-group bot-controls" role="group">
+                            <button id="start-stock-bot" class="btn btn-primary" onclick="controlBot('start', 'stock')">Start Bot</button>
+                            <button id="pause-stock-bot" class="btn btn-warning" onclick="controlBot('pause', 'stock')" disabled>Pause Bot</button>
+                            <button id="stop-stock-bot" class="btn btn-danger" onclick="controlBot('stop', 'stock')" disabled>Stop Bot</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
                         <h5>Portfolio Summary</h5>
                     </div>
                     <div class="card-body">
-                        <div id="portfolio-summary">Loading...</div>
+                        <div id="portfolio-summary">
+                            <p>Cash: <span id="cash-value">$0.00</span></p>
+                            <p>Equity: <span id="equity-value">$0.00</span></p>
+                            <p>Total Value: <span id="total-value">$0.00</span></p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -74,35 +98,18 @@
     </div>
 
     <script>
-        // Start bot function
-        document.getElementById('start-bot').addEventListener('click', function() {
-            fetch('/start')
+        // Function to control bots
+        function controlBot(action, botType) {
+            fetch(`/${action}/${botType}`)
                 .then(response => response.text())
                 .then(data => {
                     addLogEntry(data);
                     updateStatus();
+                })
+                .catch(error => {
+                    addLogEntry(`Error: ${error}`, 'negative');
                 });
-        });
-
-        // Pause bot function
-        document.getElementById('pause-bot').addEventListener('click', function() {
-            fetch('/pause')
-                .then(response => response.text())
-                .then(data => {
-                    addLogEntry(data);
-                    updateStatus();
-                });
-        });
-
-        // Stop bot function
-        document.getElementById('stop-bot').addEventListener('click', function() {
-            fetch('/stop')
-                .then(response => response.text())
-                .then(data => {
-                    addLogEntry(data);
-                    updateStatus();
-                });
-        });
+        }
 
         // Function to add log entry
         function addLogEntry(message, type = 'neutral') {
@@ -115,10 +122,10 @@
         }
 
         // Update UI based on bot status
-        function updateButtonStates(status) {
-            const startBtn = document.getElementById('start-bot');
-            const pauseBtn = document.getElementById('pause-bot');
-            const stopBtn = document.getElementById('stop-bot');
+        function updateButtonStates(botType, status) {
+            const startBtn = document.getElementById(`start-${botType}-bot`);
+            const pauseBtn = document.getElementById(`pause-${botType}-bot`);
+            const stopBtn = document.getElementById(`stop-${botType}-bot`);
             
             if (status === 'Running') {
                 startBtn.disabled = true;
@@ -143,33 +150,42 @@
             fetch('/api/status')
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('bot-status').textContent = data.status;
-                    if (data.last_started) {
-                        document.getElementById('last-started').textContent = new Date(data.last_started).toLocaleString();
+                    // Update crypto bot status
+                    document.getElementById('crypto-status').textContent = data.crypto_status;
+                    updateButtonStates('crypto', data.crypto_status);
+                    
+                    // Update stock bot status
+                    document.getElementById('stock-status').textContent = data.stock_status;
+                    updateButtonStates('stock', data.stock_status);
+                    
+                    // Update last started times if available
+                    if (data.crypto_last_started) {
+                        document.getElementById('crypto-last-started').textContent = 
+                            new Date(data.crypto_last_started).toLocaleString();
                     }
                     
-                    // Update button states based on status
-                    updateButtonStates(data.status);
+                    if (data.stock_last_started) {
+                        document.getElementById('stock-last-started').textContent = 
+                            new Date(data.stock_last_started).toLocaleString();
+                    }
                     
                     // Update portfolio summary
                     if (data.portfolio) {
-                        let portfolioHtml = `
-                            <p>Cash: $${data.portfolio.cash.toFixed(2)}</p>
-                            <p>Equity: $${data.portfolio.equity.toFixed(2)}</p>
-                            <p>Total Value: $${data.portfolio.total_value.toFixed(2)}</p>
-                        `;
-                        document.getElementById('portfolio-summary').innerHTML = portfolioHtml;
+                        document.getElementById('cash-value').textContent = `$${data.portfolio.cash.toFixed(2)}`;
+                        document.getElementById('equity-value').textContent = `$${data.portfolio.equity.toFixed(2)}`;
+                        document.getElementById('total-value').textContent = `$${data.portfolio.total_value.toFixed(2)}`;
                     }
                     
                     // Update trades
                     if (data.trades && data.trades.length > 0) {
                         let tradesHtml = '<table class="table table-striped">';
-                        tradesHtml += '<thead><tr><th>Time</th><th>Symbol</th><th>Action</th><th>Quantity</th><th>Price</th><th>Sentiment</th></tr></thead>';
+                        tradesHtml += '<thead><tr><th>Time</th><th>Bot</th><th>Symbol</th><th>Action</th><th>Quantity</th><th>Price</th><th>Sentiment</th></tr></thead>';
                         tradesHtml += '<tbody>';
                         
                         data.trades.forEach(trade => {
                             tradesHtml += `<tr>
                                 <td>${new Date(trade.time).toLocaleString()}</td>
+                                <td>${trade.bot_type}</td>
                                 <td>${trade.symbol}</td>
                                 <td>${trade.action}</td>
                                 <td>${trade.quantity}</td>
