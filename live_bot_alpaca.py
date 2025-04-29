@@ -4,7 +4,7 @@ from lumibot.backtesting import CcxtBacktesting, YahooDataBacktesting
 from lumibot.strategies.strategy import Strategy
 from datetime import datetime
 from timedelta import Timedelta
-from alpaca_trade_api.rest import REST, TimeFrame  # Add TimeFrame here
+from alpaca_trade_api import REST
 from finbert_utils import estimate_sentiment
 from colorama import Fore, init
 import numpy as np
@@ -57,14 +57,8 @@ class MLTrader(Strategy):
         return probability, sentiment
 
     def on_trading_iteration(self):
-        # Add this at the start of the method
-        self.log_message(f"Starting trading iteration at {self.get_datetime()}")
-        
         cash, last_price, quantity = self.position_sizing()
         probability, sentiment = self.get_sentiment()
-
-        # Add more logging throughout
-        self.log_message(f"Current sentiment: {sentiment} with probability {probability:.4f}")
 
         if last_price is None:
             return
@@ -104,109 +98,121 @@ class MLTrader(Strategy):
         
         # Handle neutral sentiment - add a simpler trend following approach
         elif sentiment == "neutral" and probability > 0.85:
-            # For neutral sentiment, let's use Lumibot's data fetching
+            # For neutral sentiment, let's use a simpler approach
+            today = self.get_datetime()
+            
+            # Get historical prices with length parameter
+            asset = Asset(symbol=self.coin, asset_type=Asset.AssetType.CRYPTO)
+            quote = Asset(symbol="USD", asset_type="crypto")
+            
             try:
-                # Define the asset for Lumibot's method
-                crypto_asset = Asset(symbol=self.coin, asset_type="crypto")
-                # Yahoo Finance often uses Ticker-USD format (e.g., BTC-USD)
-                # Lumibot's get_historical_prices might handle the conversion,
-                # or you might need to adjust self.coin if it fails.
-
-                # Use Lumibot's get_historical_prices
-                # It returns a Pandas DataFrame
-                historical_data_df = self.get_historical_prices(
-                    asset=crypto_asset,
-                    length=4, # Get 4 periods (days due to sleeptime="1D")
-                    quote=Asset(symbol="USD", asset_type="crypto") # Specify quote currency
+                # Simplified approach for getting historical prices
+                historical_data = self.get_historical_prices(
+                    self.coin,  # Pass symbol string directly
+                    4,          # Number of bars
+                    resolution="1day",  # Add explicit resolution parameter
+                    quote="USD"  # Quote currency
                 )
-
-                # Check if DataFrame is valid and has enough data
-                if historical_data_df is not None and not historical_data_df.empty and len(historical_data_df) >= 2:
-                    # DataFrame index is usually datetime, already sorted
-                    # Access the 'close' column
-                    close_prices = historical_data_df['close']
-
-                    # Calculate price change using DataFrame values
-                    oldest_price = close_prices.iloc[0]    # First row (oldest)
-                    newest_price = close_prices.iloc[-1]   # Last row (newest)
-
-                    # Avoid division by zero if oldest price is 0
-                    if oldest_price == 0:
-                         price_change = 0
-                    else:
-                         price_change = (newest_price - oldest_price) / oldest_price
-
-                    # Get current position (needed for trading decisions)
-                    position = self.get_position(crypto_asset) # Use the asset object
-                    # Get last price and quantity for placing orders
-                    # Note: position_sizing already calls get_last_price which might use Yahoo too
-                    cash, last_price, quantity = self.position_sizing()
-                    if last_price is None: # Need last_price for bracket orders
-                        self.log_message("Could not get last price for position sizing.", color="red")
-                        return
-
+                
+                # Continue processing if data is available
+                if historical_data is not None and len(historical_data) >= 2:  # Need at least 2 bars for trend
+                    # Sort by date, oldest first
+                    sorted_data = sorted(historical_data, key=lambda x: x.timestamp)
+                    
+                    # Calculate price change
+                    oldest_price = sorted_data[0].close
+                    newest_price = sorted_data[-1].close
+                    price_change = (newest_price - oldest_price) / oldest_price
+                    
                     # Trading decisions based on trend
                     if price_change > 0.05 and (position is None or position.quantity == 0):
                         # Buy order logic remains the same
                         order = self.create_order(
-                            crypto_asset, # Use asset object
-                            quantity * 0.5,  # Half position size
+                            self.coin,
+                            quantity * 0.5,  # Half position size for trend following
                             "buy",
                             type="bracket",
                             take_profit_price=last_price * 1.3,
                             stop_loss_price=last_price * 0.9,
-                            # quote= is implicitly USD via the asset pair
+                            quote=Asset(symbol="USD", asset_type="crypto"),
                         )
-                        print(Fore.LIGHTBLUE_EX + f"TREND BUY (Yahoo Data): {order}" + Fore.RESET)
+                        print(Fore.LIGHTBLUE_EX + f"TREND BUY: {order}" + Fore.RESET)
                         self.submit_order(order)
                         self.last_trade = "buy"
-
+                    
                     # If price is trending down at least 5% and we have a position, sell
                     elif price_change < -0.05 and position is not None and position.quantity > 0:
                         order = self.create_order(
-                            crypto_asset, # Use asset object
+                            self.coin,
                             position.quantity,
                             "sell",
-                            # quote= is implicitly USD
+                            quote=Asset(symbol="USD", asset_type="crypto"),
                         )
-                        print(Fore.LIGHTRED_EX + f"TREND SELL (Yahoo Data): {order}" + Fore.RESET)
+                        print(Fore.LIGHTRED_EX + f"TREND SELL: {order}" + Fore.RESET)
                         self.submit_order(order)
                         self.last_trade = "sell"
-                else:
-                    print(Fore.YELLOW + f"Not enough historical data received via get_historical_prices for {self.coin}." + Fore.RESET)
-
             except Exception as e:
-                # More specific error message
-                print(Fore.RED + f"Error using get_historical_prices for {self.coin}: {str(e)}" + Fore.RESET)
+                print(Fore.RED + f"Error getting historical data: {str(e)}" + Fore.RESET)
 
 
 if __name__ == "__main__":
-    from lumibot.brokers import Alpaca
-    from lumibot.traders import Trader
-    import logging
+    from lumibot.backtesting import YahooDataBacktesting
+    import numpy as np
     
-    # Set up logging
-    logging.basicConfig(level=logging.INFO)
+    start_date = datetime(2025, 1, 1)
+    end_date = datetime.now()
     
-    # Initialize Alpaca broker using the credentials dictionary
-    broker = Alpaca(ALPACA_CREDS)
-    
-    # Parameters for the strategy
     coin = "BTC"
     coin_name = "bitcoin"
     
-    # Create the strategy
-    strategy = MLTrader(
-        name="MLCryptoTrader",
-        broker=broker,
+    # Use Yahoo Finance for backtesting
+    results, strat_obj = MLTrader.run_backtest(
+        YahooDataBacktesting,
+        start_date,
+        end_date,
+        benchmark_asset="BTC-USD", 
+        quote_asset=Asset(symbol="USD", asset_type="crypto"),
+        # More realistic fees
+        buy_trading_fees=[TradingFee(percent_fee=0.0035)],  # 0.35% is typical for crypto exchanges
+        sell_trading_fees=[TradingFee(percent_fee=0.0035)],
+        # Slippage to account for market impact
+        slippage_model=lambda price, order_side, size: price * (1 + (0.001 * (-1 if order_side == "buy" else 1))),
+        initial_capital=100000,
         parameters={
-            "cash_at_risk": 0.40,
+            "cash_at_risk": 0.40,  # Slightly more conservative
             "coin": coin,
             "coin_name": coin_name,
         }
     )
     
-    # Create trader and run the strategy
-    trader = Trader()
-    trader.add_strategy(strategy)
-    trader.run_all()
+    # Print key performance metrics with error handling
+    if results is not None and isinstance(results, dict):
+        # Handle return
+        strat_return = results.get('return', 0)
+        if isinstance(strat_return, (int, float)):
+            print(f"Strategy Return: {strat_return:.2%}")
+        else:
+            print(f"Strategy Return: {strat_return}")
+        
+        # Handle sharpe
+        sharpe = results.get('sharpe', 0)
+        if isinstance(sharpe, (int, float)):
+            print(f"Strategy Sharpe: {sharpe:.2f}")
+        else:
+            print(f"Strategy Sharpe: {sharpe}")
+        
+        # Handle max_drawdown
+        max_dd = results.get('max_drawdown', 0)
+        if isinstance(max_dd, (int, float)):
+            print(f"Strategy Max Drawdown: {max_dd:.2%}")
+        else:
+            print(f"Strategy Max Drawdown: {max_dd}")
+        
+        # Handle benchmark comparison
+        benchmark_return = results.get('benchmark_return', 0)
+        if isinstance(benchmark_return, (int, float)) and isinstance(strat_return, (int, float)):
+            print(f"Strategy vs Benchmark: {strat_return - benchmark_return:.2%}")
+        else:
+            print("Strategy vs Benchmark: Not available")
+    else:
+        print("Backtest did not complete successfully.")

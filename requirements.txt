@@ -1,0 +1,6 @@
+lumibot>=3.11.10
+alpaca-trade-api>=3.2.0
+colorama>=0.4.6
+timedelta>=2020.12.3
+transformers>=4.51.3
+torch>=2.7.0
