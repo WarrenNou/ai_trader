@@ -154,6 +154,35 @@ class MLTrader(Strategy):
             except Exception as e:
                 print(Fore.RED + f"Error getting historical data: {str(e)}" + Fore.RESET)
 
+    def log_performance(self):
+        """Log key performance metrics during trading"""
+        try:
+            # Get current position and portfolio data
+            position = self.get_position(Asset(symbol=self.coin, asset_type="crypto"))
+            portfolio_value = self.portfolio_value
+            cash = self.get_cash()
+            
+            # Calculate metrics
+            position_value = 0 if position is None else position.market_value
+            allocation = 0 if portfolio_value == 0 else position_value / portfolio_value
+            
+            # Log the information
+            self.log_message(f"Portfolio Value: ${portfolio_value:.2f}")
+            self.log_message(f"Cash: ${cash:.2f}")
+            self.log_message(f"Position Value: ${position_value:.2f} ({allocation:.2%} allocation)")
+            
+            # If we have a position, log its details
+            if position is not None and position.quantity > 0:
+                entry_price = position.average_entry_price if hasattr(position, 'average_entry_price') else 0
+                current_price = self.get_last_price(Asset(symbol=self.coin, asset_type="crypto"), 
+                                                   quote=Asset(symbol="USD", asset_type="crypto"))
+                if entry_price > 0 and current_price is not None:
+                    profit_pct = (current_price - entry_price) / entry_price
+                    self.log_message(f"Current P&L: {profit_pct:.2%}")
+        
+        except Exception as e:
+            print(f"Error logging performance: {str(e)}")
+
 
 if __name__ == "__main__":
     from lumibot.backtesting import YahooDataBacktesting

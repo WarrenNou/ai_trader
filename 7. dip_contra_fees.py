@@ -10,8 +10,8 @@ from colorama import Fore, init
 import numpy as np
 
 
-API_KEY = "PK71L3FGRWSNX7OHFWP0"
-API_SECRET = "WsDYxovs8GbTcrA7PYelukQwDDqZaDQU0wjIlGwy"
+API_KEY = "PKJ172HF65HRI6Z7R8AA"
+API_SECRET = "ZqlwAbdF8r5GaW5aJhcOHcwIMUPvnnwuZL3XGQTT"
 BASE_URL = "https://paper-api.alpaca.markets/v2"
 
 ALPACA_CREDS = {"API_KEY": API_KEY, "API_SECRET": API_SECRET, "PAPER": True}
@@ -59,6 +59,9 @@ class MLTrader(Strategy):
     def on_trading_iteration(self):
         # Add this at the start of the method
         self.log_message(f"Starting trading iteration at {self.get_datetime()}")
+        
+        # Log performance metrics
+        self.log_performance()  # Add this line to track performance
         
         # Get accurate portfolio data directly from broker
         cash = self.get_cash()
@@ -201,14 +204,162 @@ class MLTrader(Strategy):
                 # More specific error message
                 print(Fore.RED + f"Error using get_historical_prices for {self.coin}: {str(e)}" + Fore.RESET)
 
+    def log_performance(self):
+        """Log key performance metrics during trading"""
+        try:
+            # Get current position and portfolio data
+            position = self.get_position(Asset(symbol=self.coin, asset_type="crypto"))
+            portfolio_value = self.portfolio_value
+            cash = self.get_cash()
+            
+            # Calculate metrics
+            position_value = 0 if position is None else position.market_value
+            allocation = 0 if portfolio_value == 0 else position_value / portfolio_value
+            
+            # Log the information
+            self.log_message(f"Portfolio Value: ${portfolio_value:.2f}")
+            self.log_message(f"Cash: ${cash:.2f}")
+            self.log_message(f"Position Value: ${position_value:.2f} ({allocation:.2%} allocation)")
+            
+            # If we have a position, log its details
+            if position is not None and position.quantity > 0:
+                entry_price = position.average_entry_price if hasattr(position, 'average_entry_price') else 0
+                current_price = self.get_last_price(Asset(symbol=self.coin, asset_type="crypto"), 
+                                                   quote=Asset(symbol="USD", asset_type="crypto"))
+                if entry_price > 0 and current_price is not None:
+                    profit_pct = (current_price - entry_price) / entry_price
+                    self.log_message(f"Current P&L: {profit_pct:.2%}")
+        
+        except Exception as e:
+            self.log_message(f"Error logging performance: {str(e)}", color="red")
+
+    def send_test_trade(self):
+        """Send a small test trade and immediately cancel it"""
+        try:
+            print(Fore.CYAN + "Sending test trade..." + Fore.RESET)
+            
+            # Get current price
+            last_price = self.get_last_price(
+                Asset(symbol=self.coin, asset_type=Asset.AssetType.CRYPTO),
+                quote=Asset(symbol="USD", asset_type="crypto"),
+            )
+            
+            if last_price is None:
+                print(Fore.RED + "Error: Could not get current price for test trade" + Fore.RESET)
+                return
+                
+            # Calculate a very small quantity (about $10 worth)
+            quantity = 10 / last_price
+            
+            # Create a market buy order
+            order = self.create_order(
+                self.coin,
+                quantity,
+                "buy",
+                type="market",
+                quote=Asset(symbol="USD", asset_type="crypto"),
+            )
+            
+            print(Fore.LIGHTMAGENTA_EX + f"TEST BUY ORDER: {order}" + Fore.RESET)
+            
+            # Submit the order
+            submitted_order = self.submit_order(order)
+            print(Fore.GREEN + f"Test order submitted: {submitted_order}" + Fore.RESET)
+            
+            # Wait a moment to ensure the order is processed
+            import time
+            time.sleep(2)
+            
+            # Get the position (if the order was filled)
+            position = self.get_position(Asset(symbol=self.coin, asset_type="crypto"))
+            
+            if position is not None and position.quantity > 0:
+                # Create a sell order to close the position
+                sell_order = self.create_order(
+                    self.coin,
+                    position.quantity,
+                    "sell",
+                    type="market",
+                    quote=Asset(symbol="USD", asset_type="crypto"),
+                )
+                
+                print(Fore.LIGHTCYAN_EX + f"TEST SELL ORDER: {sell_order}" + Fore.RESET)
+                
+                # Submit the sell order
+                submitted_sell = self.submit_order(sell_order)
+                print(Fore.GREEN + f"Test sell order submitted: {submitted_sell}" + Fore.RESET)
+            
+            return True
+            
+        except Exception as e:
+            print(Fore.RED + f"Error sending test trade: {str(e)}" + Fore.RESET)
+            return False
+
 
 if __name__ == "__main__":
     from lumibot.brokers import Alpaca
     from lumibot.traders import Trader
     import logging
+    from alpaca_trade_api import REST
+    import time
     
     # Set up logging
     logging.basicConfig(level=logging.INFO)
+    
+    # Test connection directly with Alpaca API
+    print("Testing connection to Alpaca API...")
+    try:
+        # Create a direct connection to Alpaca API
+        api = REST(
+            key_id=API_KEY,
+            secret_key=API_SECRET,
+            base_url="https://paper-api.alpaca.markets"  # No trailing /v2
+        )
+        
+        # Get account information
+        account = api.get_account()
+        print(f"Successfully connected to Alpaca!")
+        print(f"Account ID: {account.id}")
+        print(f"Account Status: {account.status}")
+        print(f"Cash: ${float(account.cash):.2f}")
+        print(f"Portfolio Value: ${float(account.portfolio_value):.2f}")
+        
+        # Test if crypto trading is available by placing a small test order directly
+        print("Sending a direct test trade via Alpaca API...")
+        try:
+            # Create a small market buy order for BTC
+            test_order = api.submit_order(
+                symbol="BTC/USD",
+                qty=0.0001,  # Very small quantity
+                side="buy",
+                type="market",
+                time_in_force="gtc"
+            )
+            print(f"Test order placed successfully: {test_order.id}")
+            
+            # Wait a moment for the order to process
+            time.sleep(2)
+            
+            # Check the order status
+            order_status = api.get_order(test_order.id)
+            print(f"Test order status: {order_status.status}")
+            
+            # Cancel the order if it's still open
+            if order_status.status in ['new', 'accepted', 'pending_new']:
+                api.cancel_order(test_order.id)
+                print(f"Test order cancelled successfully")
+            
+        except Exception as e:
+            print(f"Error placing direct test order: {str(e)}")
+            # Continue anyway, as this might be due to crypto not being available
+            # but the strategy might still work with the broker
+            
+    except Exception as e:
+        print(f"Error connecting to Alpaca API: {str(e)}")
+        print("Please check your API keys and try again.")
+        exit(1)
+    
+    print("API connection test completed. Initializing trading strategy...")
     
     # Initialize Alpaca broker using the credentials dictionary
     broker = Alpaca(ALPACA_CREDS)
@@ -222,7 +373,7 @@ if __name__ == "__main__":
         name="MLCryptoTrader",
         broker=broker,
         parameters={
-            "cash_at_risk": 0.40,
+            "cash_at_risk": 0.40,  # Using 40% of available cash per trade
             "coin": coin,
             "coin_name": coin_name,
         }
@@ -231,4 +382,11 @@ if __name__ == "__main__":
     # Create trader and run the strategy
     trader = Trader()
     trader.add_strategy(strategy)
+    
+    # Log that we're starting paper trading
+    print(f"Starting paper trading for {coin} using contrarian sentiment strategy")
+    print(f"Using Alpaca Paper Trading account with API key: {API_KEY[:5]}...")
+    print("Press Ctrl+C to stop the trader")
+    
+    # Run the strategy in the main thread
     trader.run_all()
