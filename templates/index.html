@@ -4,40 +4,88 @@
     <title>Trading Bot Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
-        body { padding-top: 20px; }
-        .card { margin-bottom: 20px; }
+        body { padding-top: 20px; background-color: #f8f9fa; }
+        .card { 
+            margin-bottom: 20px; 
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            background-color: #f1f8ff;
+            border-bottom: 1px solid rgba(0,0,0,0.125);
+            font-weight: 600;
+        }
         #log-container { 
             height: 300px; 
             overflow-y: auto; 
             background-color: #f8f9fa; 
             padding: 10px;
             font-family: monospace;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
         }
         .log-entry { margin-bottom: 5px; }
-        .positive { color: green; }
-        .negative { color: red; }
-        .neutral { color: blue; }
+        .positive { color: #198754; }
+        .negative { color: #dc3545; }
+        .neutral { color: #0d6efd; }
+        .warning { color: #fd7e14; }
         .bot-controls { margin-bottom: 10px; }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        .status-running { background-color: #d1e7dd; color: #0f5132; }
+        .status-paused { background-color: #fff3cd; color: #664d03; }
+        .status-stopped { background-color: #f8d7da; color: #842029; }
+        .trade-row:hover { background-color: #f1f8ff; }
+        .portfolio-card { background-color: #f1f8ff; }
+        .portfolio-value { font-size: 1.5rem; font-weight: 600; }
+        .portfolio-change { font-size: 0.9rem; }
+        .coin-icon { width: 24px; height: 24px; margin-right: 5px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="mb-4">Trading Bot Dashboard</h1>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-graph-up-arrow"></i> Trading Bot Dashboard</h1>
+            <div class="text-end">
+                <span class="badge bg-secondary" id="server-time"></span>
+            </div>
+        </div>
         
         <div class="row">
             <div class="col-md-6">
                 <div class="card">
-                    <div class="card-header">
-                        <h5>Crypto Bot Status</h5>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="bi bi-currency-bitcoin"></i> Crypto Bot Status</h5>
+                        <span id="crypto-status-badge" class="status-badge status-stopped">Idle</span>
                     </div>
                     <div class="card-body">
-                        <p>Status: <span id="crypto-status">Idle</span></p>
-                        <p>Last Started: <span id="crypto-last-started">Never</span></p>
-                        <div class="btn-group bot-controls" role="group">
-                            <button id="start-crypto-bot" class="btn btn-primary" onclick="controlBot('start', 'crypto')">Start Bot</button>
-                            <button id="pause-crypto-bot" class="btn btn-warning" onclick="controlBot('pause', 'crypto')" disabled>Pause Bot</button>
-                            <button id="stop-crypto-bot" class="btn btn-danger" onclick="controlBot('stop', 'crypto')" disabled>Stop Bot</button>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <p><strong>Status:</strong> <span id="crypto-status">Idle</span></p>
+                                <p><strong>Trading Pair:</strong> <span id="crypto-pair">BTC/USD</span></p>
+                                <p><strong>Risk Level:</strong> <span id="crypto-risk">40%</span></p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Last Started:</strong> <span id="crypto-last-started">Never</span></p>
+                                <p><strong>Strategy:</strong> <span>Contrarian Sentiment</span></p>
+                                <p><strong>Mode:</strong> <span>Paper Trading</span></p>
+                            </div>
+                        </div>
+                        <div class="btn-group bot-controls w-100" role="group">
+                            <button id="start-crypto-bot" class="btn btn-primary" onclick="controlBot('start', 'crypto')">
+                                <i class="bi bi-play-fill"></i> Start Bot
+                            </button>
+                            <button id="pause-crypto-bot" class="btn btn-warning" onclick="controlBot('pause', 'crypto')" disabled>
+                                <i class="bi bi-pause-fill"></i> Pause Bot
+                            </button>
+                            <button id="stop-crypto-bot" class="btn btn-danger" onclick="controlBot('stop', 'crypto')" disabled>
+                                <i class="bi bi-stop-fill"></i> Stop Bot
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -45,16 +93,33 @@
             
             <div class="col-md-6">
                 <div class="card">
-                    <div class="card-header">
-                        <h5>Stock Bot Status</h5>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="bi bi-graph-up"></i> Stock Bot Status</h5>
+                        <span id="stock-status-badge" class="status-badge status-stopped">Idle</span>
                     </div>
                     <div class="card-body">
-                        <p>Status: <span id="stock-status">Idle</span></p>
-                        <p>Last Started: <span id="stock-last-started">Never</span></p>
-                        <div class="btn-group bot-controls" role="group">
-                            <button id="start-stock-bot" class="btn btn-primary" onclick="controlBot('start', 'stock')">Start Bot</button>
-                            <button id="pause-stock-bot" class="btn btn-warning" onclick="controlBot('pause', 'stock')" disabled>Pause Bot</button>
-                            <button id="stop-stock-bot" class="btn btn-danger" onclick="controlBot('stop', 'stock')" disabled>Stop Bot</button>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <p><strong>Status:</strong> <span id="stock-status">Idle</span></p>
+                                <p><strong>Market:</strong> <span>US Equities</span></p>
+                                <p><strong>Risk Level:</strong> <span id="stock-risk">30%</span></p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Last Started:</strong> <span id="stock-last-started">Never</span></p>
+                                <p><strong>Strategy:</strong> <span>Sentiment Analysis</span></p>
+                                <p><strong>Mode:</strong> <span>Paper Trading</span></p>
+                            </div>
+                        </div>
+                        <div class="btn-group bot-controls w-100" role="group">
+                            <button id="start-stock-bot" class="btn btn-primary" onclick="controlBot('start', 'stock')">
+                                <i class="bi bi-play-fill"></i> Start Bot
+                            </button>
+                            <button id="pause-stock-bot" class="btn btn-warning" onclick="controlBot('pause', 'stock')" disabled>
+                                <i class="bi bi-pause-fill"></i> Pause Bot
+                            </button>
+                            <button id="stop-stock-bot" class="btn btn-danger" onclick="controlBot('stop', 'stock')" disabled>
+                                <i class="bi bi-stop-fill"></i> Stop Bot
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -63,15 +128,27 @@
         
         <div class="row">
             <div class="col-md-12">
-                <div class="card">
+                <div class="card portfolio-card">
                     <div class="card-header">
-                        <h5>Portfolio Summary</h5>
+                        <h5><i class="bi bi-wallet2"></i> Portfolio Summary</h5>
                     </div>
                     <div class="card-body">
-                        <div id="portfolio-summary">
-                            <p>Cash: <span id="cash-value">$0.00</span></p>
-                            <p>Equity: <span id="equity-value">$0.00</span></p>
-                            <p>Total Value: <span id="total-value">$0.00</span></p>
+                        <div class="row" id="portfolio-summary">
+                            <div class="col-md-4 text-center">
+                                <p class="text-muted mb-1">Cash</p>
+                                <p class="portfolio-value" id="cash-value">$0.00</p>
+                                <p class="portfolio-change" id="cash-change">+0.00% today</p>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <p class="text-muted mb-1">Equity</p>
+                                <p class="portfolio-value" id="equity-value">$0.00</p>
+                                <p class="portfolio-change" id="equity-change">+0.00% today</p>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <p class="text-muted mb-1">Total Value</p>
+                                <p class="portfolio-value" id="total-value">$0.00</p>
+                                <p class="portfolio-change" id="total-change">+0.00% today</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -79,17 +156,23 @@
         </div>
         
         <div class="card">
-            <div class="card-header">
-                <h5>Recent Trades</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-arrow-left-right"></i> Recent Trades</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="refreshTrades()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
             </div>
             <div class="card-body">
-                <div id="recent-trades">No trades yet</div>
+                <div id="recent-trades" class="table-responsive">No trades yet</div>
             </div>
         </div>
         
         <div class="card">
-            <div class="card-header">
-                <h5>Bot Logs</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-terminal"></i> Bot Logs</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="clearLogs()">
+                    <i class="bi bi-trash"></i> Clear
+                </button>
             </div>
             <div class="card-body">
                 <div id="log-container"></div>
@@ -100,6 +183,15 @@
     <script>
         // Function to control bots
         function controlBot(action, botType) {
+            const startBtn = document.getElementById(`start-${botType}-bot`);
+            const pauseBtn = document.getElementById(`pause-${botType}-bot`);
+            const stopBtn = document.getElementById(`stop-${botType}-bot`);
+            
+            // Disable all buttons during the request
+            startBtn.disabled = true;
+            pauseBtn.disabled = true;
+            stopBtn.disabled = true;
+            
             fetch(`/${action}/${botType}`)
                 .then(response => response.text())
                 .then(data => {
@@ -108,6 +200,8 @@
                 })
                 .catch(error => {
                     addLogEntry(`Error: ${error}`, 'negative');
+                    // Re-enable buttons on error
+                    updateButtonStates(botType, document.getElementById(`${botType}-status`).textContent);
                 });
         }
 
@@ -121,28 +215,55 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
+        // Clear logs
+        function clearLogs() {
+            document.getElementById('log-container').innerHTML = '';
+            addLogEntry('Logs cleared', 'neutral');
+        }
+
+        // Refresh trades manually
+        function refreshTrades() {
+            addLogEntry('Refreshing trade data...', 'neutral');
+            updateStatus();
+        }
+
         // Update UI based on bot status
         function updateButtonStates(botType, status) {
             const startBtn = document.getElementById(`start-${botType}-bot`);
             const pauseBtn = document.getElementById(`pause-${botType}-bot`);
             const stopBtn = document.getElementById(`stop-${botType}-bot`);
+            const statusBadge = document.getElementById(`${botType}-status-badge`);
+            
+            // Update status badge class
+            statusBadge.className = 'status-badge';
+            statusBadge.textContent = status;
             
             if (status === 'Running') {
                 startBtn.disabled = true;
                 pauseBtn.disabled = false;
                 stopBtn.disabled = false;
-                startBtn.textContent = 'Start Bot';
+                startBtn.innerHTML = '<i class="bi bi-play-fill"></i> Start Bot';
+                statusBadge.classList.add('status-running');
             } else if (status === 'Paused') {
                 startBtn.disabled = false;
                 pauseBtn.disabled = true;
                 stopBtn.disabled = false;
-                startBtn.textContent = 'Resume Bot';
+                startBtn.innerHTML = '<i class="bi bi-play-fill"></i> Resume Bot';
+                statusBadge.classList.add('status-paused');
             } else { // Stopped or Idle
                 startBtn.disabled = false;
                 pauseBtn.disabled = true;
                 stopBtn.disabled = true;
-                startBtn.textContent = 'Start Bot';
+                startBtn.innerHTML = '<i class="bi bi-play-fill"></i> Start Bot';
+                statusBadge.classList.add('status-stopped');
             }
+        }
+
+        // Update server time
+        function updateServerTime() {
+            const serverTimeElement = document.getElementById('server-time');
+            const now = new Date();
+            serverTimeElement.textContent = now.toLocaleString();
         }
 
         // Fetch bot status periodically
@@ -152,10 +273,12 @@
                 .then(data => {
                     // Update crypto bot status
                     document.getElementById('crypto-status').textContent = data.crypto_status;
+                    document.getElementById('crypto-status-badge').textContent = data.crypto_status;
                     updateButtonStates('crypto', data.crypto_status);
                     
                     // Update stock bot status
                     document.getElementById('stock-status').textContent = data.stock_status;
+                    document.getElementById('stock-status-badge').textContent = data.stock_status;
                     updateButtonStates('stock', data.stock_status);
                     
                     // Update last started times if available
@@ -174,6 +297,26 @@
                         document.getElementById('cash-value').textContent = `$${data.portfolio.cash.toFixed(2)}`;
                         document.getElementById('equity-value').textContent = `$${data.portfolio.equity.toFixed(2)}`;
                         document.getElementById('total-value').textContent = `$${data.portfolio.total_value.toFixed(2)}`;
+                        
+                        // Calculate daily changes (placeholder - would need actual daily change data)
+                        const cashChange = ((data.portfolio.cash / 10000) - 1) * 100;
+                        const equityChange = ((data.portfolio.equity / 5000) - 1) * 100;
+                        const totalChange = ((data.portfolio.total_value / 15000) - 1) * 100;
+                        
+                        document.getElementById('cash-change').textContent = 
+                            `${cashChange > 0 ? '+' : ''}${cashChange.toFixed(2)}% today`;
+                        document.getElementById('cash-change').className = 
+                            `portfolio-change ${cashChange >= 0 ? 'positive' : 'negative'}`;
+                            
+                        document.getElementById('equity-change').textContent = 
+                            `${equityChange > 0 ? '+' : ''}${equityChange.toFixed(2)}% today`;
+                        document.getElementById('equity-change').className = 
+                            `portfolio-change ${equityChange >= 0 ? 'positive' : 'negative'}`;
+                            
+                        document.getElementById('total-change').textContent = 
+                            `${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}% today`;
+                        document.getElementById('total-change').className = 
+                            `portfolio-change ${totalChange >= 0 ? 'positive' : 'negative'}`;
                     }
                     
                     // Update trades
@@ -183,14 +326,18 @@
                         tradesHtml += '<tbody>';
                         
                         data.trades.forEach(trade => {
-                            tradesHtml += `<tr>
+                            const sentimentClass = trade.sentiment.toLowerCase();
+                            tradesHtml += `<tr class="trade-row">
                                 <td>${new Date(trade.time).toLocaleString()}</td>
                                 <td>${trade.bot_type}</td>
-                                <td>${trade.symbol}</td>
-                                <td>${trade.action}</td>
+                                <td>
+                                    <img src="https://cryptoicons.org/api/icon/${trade.symbol.toLowerCase()}/24" onerror="this.src='https://via.placeholder.com/24';" class="coin-icon">
+                                    ${trade.symbol}
+                                </td>
+                                <td class="${trade.action === 'BUY' ? 'positive' : 'negative'}">${trade.action}</td>
                                 <td>${trade.quantity}</td>
                                 <td>$${trade.price.toFixed(2)}</td>
-                                <td class="${trade.sentiment}">${trade.sentiment}</td>
+                                <td class="${sentimentClass}">${trade.sentiment}</td>
                             </tr>`;
                         });
                         
@@ -200,22 +347,43 @@
                     
                     // Update logs
                     if (data.logs && data.logs.length > 0) {
-                        // Clear existing logs first to avoid duplicates
-                        document.getElementById('log-container').innerHTML = '';
-                        
+                        // Don't clear existing logs to avoid flickering
                         data.logs.forEach(log => {
-                            addLogEntry(log.message, log.type);
+                            // Check if this log entry is already displayed
+                            const logEntries = document.querySelectorAll('.log-entry');
+                            let isDuplicate = false;
+                            
+                            for (let i = Math.max(0, logEntries.length - 10); i < logEntries.length; i++) {
+                                if (logEntries[i].textContent.includes(log.message)) {
+                                    isDuplicate = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!isDuplicate) {
+                                addLogEntry(log.message, log.type);
+                            }
                         });
                     }
+                    
+                    // Update server time
+                    updateServerTime();
                 })
                 .catch(error => {
                     console.error('Error fetching status:', error);
+                    addLogEntry(`Error fetching status: ${error}`, 'negative');
                 });
         }
 
         // Update status every 5 seconds
         setInterval(updateStatus, 5000);
-        updateStatus(); // Initial update
+        
+        // Update server time every second
+        setInterval(updateServerTime, 1000);
+        
+        // Initial updates
+        updateStatus();
+        updateServerTime();
     </script>
 </body>
 </html>

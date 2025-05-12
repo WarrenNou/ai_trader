@@ -245,7 +245,7 @@ def run_crypto_bot():
             # Use a lightweight approach to run the crypto trading script
             # Redirect output to our log file
             crypto_bot_process = subprocess.Popen(
-                ["python", "7. dip_contra_fees.py"],
+                ["python", "7. dip_contra_fees.py", "--coin", "BTC", "--risk", "0.40"],
                 stdout=log_file,
                 stderr=log_file,
                 universal_newlines=True
