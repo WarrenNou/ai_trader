@@ -561,6 +561,112 @@ class MultiStockTrader(Strategy):
             current = current_allocation.get(symbol, {}).get('allocation', 0)
             allocation_diff[symbol] = target - current
         
+        # Check if cash is negative or too low for trading
+        cash = self.get_cash()
+        if cash < 1000:  # If cash is below $1000, we need to free up some funds
+            print(f"{Fore.YELLOW}Cash is low (${cash:.2f}). Looking for positions to trim to free up cash...{Fore.RESET}")
+            
+            # Get all positions, not just those in stocks_config
+            all_positions = self.get_positions()
+            
+            # Find positions to sell - consider ALL positions, not just those in stocks_config
+            positions_to_sell = []
+            
+            # First, identify positions that aren't in our target configuration at all
+            target_symbols = [stock['symbol'] for stock in self.stocks_config]
+            
+            for position in all_positions:
+                symbol = position.symbol
+                
+                # Skip positions with zero quantity
+                if position.quantity <= 0:
+                    continue
+                    
+                # Get current price
+                price = self.get_last_price(symbol)
+                if price is None:
+                    continue
+                    
+                position_value = position.quantity * price
+                
+                # If position is not in our target configuration, consider selling it completely
+                if symbol not in target_symbols:
+                    positions_to_sell.append({
+                        'symbol': symbol,
+                        'position': position,
+                        'price': price,
+                        'value_to_reduce': position_value,
+                        'priority': 1  # Highest priority - not in target config
+                    })
+                else:
+                    # For positions in our target config, check if they're overallocated
+                    target_weight = next((stock['weight'] for stock in self.stocks_config if stock['symbol'] == symbol), 0)
+                    current_allocation_pct = position_value / self.portfolio_value if self.portfolio_value > 0 else 0
+                    alloc_diff = current_allocation_pct - target_weight
+                    
+                    if alloc_diff > 0.02:  # More than 2% overallocated
+                        target_value = self.portfolio_value * target_weight
+                        value_to_reduce = position_value - target_value
+                        
+                        positions_to_sell.append({
+                            'symbol': symbol,
+                            'position': position,
+                            'price': price,
+                            'value_to_reduce': value_to_reduce,
+                            'priority': 2  # Lower priority - in target config but overallocated
+                        })
+            
+            # Sort by priority first, then by value_to_reduce (descending)
+            positions_to_sell.sort(key=lambda x: (x['priority'], -x['value_to_reduce']))
+            
+            # Sell positions until we free up enough cash
+            cash_needed = abs(cash) + 2000  # Target to free up negative cash plus $2000 buffer
+            cash_freed = 0
+            
+            for item in positions_to_sell:
+                if cash_freed >= cash_needed:
+                    break
+                    
+                symbol = item['symbol']
+                position = item['position']
+                price = item['price']
+                value_to_reduce = min(item['value_to_reduce'], cash_needed - cash_freed)
+                
+                # Calculate shares to sell (round down to ensure we don't oversell)
+                shares_to_sell = int(value_to_reduce / price)
+                
+                # Ensure we're not selling more than we have
+                shares_to_sell = min(shares_to_sell, position.quantity)
+                
+                if shares_to_sell > 0:
+                    try:
+                        order = self.create_order(
+                            symbol,
+                            shares_to_sell,
+                            "sell",
+                            order_type="market"
+                        )
+                        
+                        reason = "NOT IN TARGET CONFIG" if item['priority'] == 1 else "OVERALLOCATED"
+                        print(f"{Fore.RED}CASH MANAGEMENT SELL for {symbol}: {shares_to_sell} shares at ${price:.2f} ({reason}){Fore.RESET}")
+                        self.submit_order(order)
+                        
+                        # Log the trade
+                        self.log_trade(symbol, "cash_management_sell", shares_to_sell, price, "neutral", 0.5)
+                        
+                        # Update cash freed
+                        cash_freed += shares_to_sell * price
+                    
+                    except Exception as e:
+                        print(f"{Fore.RED}Error creating sell order for {symbol}: {str(e)}{Fore.RESET}")
+                        import traceback
+                        traceback.print_exc()
+            
+            if cash_freed > 0:
+                print(f"{Fore.GREEN}Freed up approximately ${cash_freed:.2f} in cash by selling positions{Fore.RESET}")
+            else:
+                print(f"{Fore.YELLOW}Could not find suitable positions to sell to free up cash{Fore.RESET}")
+        
         # Process each stock in our configuration
         for stock_config in self.stocks_config:
             symbol = stock_config["symbol"]
@@ -580,7 +686,18 @@ class MultiStockTrader(Strategy):
             
             # Trading logic - TRADITIONAL APPROACH: buy on positive sentiment
             if sentiment == "positive" and probability > 0.75:
-                if position is None or position.quantity == 0 or allocation_diff.get(symbol, 0) > 0.02:  # Only buy if underallocated by >2%
+                # Check if underallocated by >2%
+                current_alloc = current_allocation.get(symbol, {}).get('allocation', 0)
+                target_alloc = stock_config["weight"]
+                alloc_diff = target_alloc - current_alloc
+                
+                if position is None or position.quantity == 0 or alloc_diff > 0.02:
+                    # Check if we have enough cash
+                    cash = self.get_cash()
+                    if cash <= 0:
+                        print(f"{Fore.YELLOW}Not enough cash (${cash:.2f}) to buy {symbol}, skipping{Fore.RESET}")
+                        continue
+                    
                     # Calculate quantity
                     quantity = self.position_sizing(symbol, price)
                     
@@ -621,26 +738,32 @@ class MultiStockTrader(Strategy):
                     self.log_trade(symbol, "sell", position.quantity, price, sentiment, float(probability))
             
             # Rebalancing logic - if significantly overallocated (>5%) and neutral sentiment, trim position
-            elif sentiment == "neutral" and allocation_diff.get(symbol, 0) < -0.05 and position is not None and position.quantity > 0:
-                # Calculate how much to sell to get closer to target
-                target_value = self.portfolio_value * stock_config["weight"]
-                current_value = position.quantity * price
-                value_to_reduce = current_value - target_value
-                shares_to_sell = int(value_to_reduce / price)
+            elif sentiment == "neutral" and position is not None and position.quantity > 0:
+                # Calculate allocation difference
+                current_alloc = current_allocation.get(symbol, {}).get('allocation', 0)
+                target_alloc = stock_config["weight"]
+                alloc_diff = current_alloc - target_alloc
                 
-                if shares_to_sell > 0 and shares_to_sell < position.quantity:
-                    order = self.create_order(
-                        symbol,
-                        shares_to_sell,
-                        "sell",
-                        order_type="market"
-                    )
+                if alloc_diff > 0.05:  # More than 5% overallocated
+                    # Calculate how much to sell to get closer to target
+                    target_value = self.portfolio_value * target_alloc
+                    current_value = position.quantity * price
+                    value_to_reduce = current_value - target_value
+                    shares_to_sell = int(value_to_reduce / price)
                     
-                    print(f"{Fore.YELLOW}REBALANCE SELL for {symbol}: {shares_to_sell} shares at ${price:.2f} (OVERALLOCATED){Fore.RESET}")
-                    self.submit_order(order)
-                    
-                    # Log the trade
-                    self.log_trade(symbol, "rebalance_sell", shares_to_sell, price, "neutral", 0.5)
+                    if shares_to_sell > 0 and shares_to_sell < position.quantity:
+                        order = self.create_order(
+                            symbol,
+                            shares_to_sell,
+                            "sell",
+                            order_type="market"
+                        )
+                        
+                        print(f"{Fore.YELLOW}REBALANCE SELL for {symbol}: {shares_to_sell} shares at ${price:.2f} (OVERALLOCATED){Fore.RESET}")
+                        self.submit_order(order)
+                        
+                        # Log the trade
+                        self.log_trade(symbol, "rebalance_sell", shares_to_sell, price, "neutral", 0.5)
             
             # Log portfolio status for this stock
             self.log_position_status(symbol, price)

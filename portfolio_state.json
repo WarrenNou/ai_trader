@@ -1,15 +1,15 @@
 {
-  "timestamp": "2025-05-12 14:39:01",
-  "portfolio_value": 99494.47,
-  "cash": -682.88,
+  "timestamp": "2025-05-12 14:59:01",
+  "portfolio_value": 99343.48,
+  "cash": 160.86,
   "positions": {
     "AMZN": {
-      "quantity": 47.0,
+      "quantity": 25.0,
       "price": 0.0,
       "value": 0.0
     },
     "ATO": {
-      "quantity": 1.0,
+      "quantity": 55.0,
       "price": 0.0,
       "value": 0.0
     },
@@ -19,22 +19,22 @@
       "value": 0.0
     },
     "CNP": {
-      "quantity": 4.0,
+      "quantity": 52.0,
       "price": 0.0,
       "value": 0.0
     },
     "COP": {
-      "quantity": 45.0,
+      "quantity": 44.0,
       "price": 0.0,
       "value": 0.0
     },
     "CSX": {
-      "quantity": 83.0,
+      "quantity": 82.0,
       "price": 0.0,
       "value": 0.0
     },
     "DUK": {
-      "quantity": 74.0,
+      "quantity": 69.0,
       "price": 0.0,
       "value": 0.0
     },
@@ -49,12 +49,12 @@
       "value": 0.0
     },
     "EQIX": {
-      "quantity": 20.0,
+      "quantity": 16.0,
       "price": 0.0,
       "value": 0.0
     },
     "GOOGL": {
-      "quantity": 62.0,
+      "quantity": 44.0,
       "price": 0.0,
       "value": 0.0
     },
@@ -64,7 +64,7 @@
       "value": 0.0
     },
     "LMT": {
-      "quantity": 20.0,
+      "quantity": 12.0,
       "price": 0.0,
       "value": 0.0
     },
@@ -74,7 +74,7 @@
       "value": 0.0
     },
     "MSFT": {
-      "quantity": 27.0,
+      "quantity": 13.0,
       "price": 0.0,
       "value": 0.0
     },
@@ -84,12 +84,17 @@
       "value": 0.0
     },
     "PM": {
-      "quantity": 1.0,
+      "quantity": 25.0,
       "price": 0.0,
       "value": 0.0
     },
     "ROL": {
-      "quantity": 6.0,
+      "quantity": 54.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "RSG": {
+      "quantity": 4.0,
       "price": 0.0,
       "value": 0.0
     },
@@ -99,7 +104,7 @@
       "value": 0.0
     },
     "VTR": {
-      "quantity": 5.0,
+      "quantity": 52.0,
       "price": 0.0,
       "value": 0.0
     },
