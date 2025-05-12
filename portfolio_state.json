@@ -1,0 +1,112 @@
+{
+  "timestamp": "2025-05-12 14:39:01",
+  "portfolio_value": 99494.47,
+  "cash": -682.88,
+  "positions": {
+    "AMZN": {
+      "quantity": 47.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "ATO": {
+      "quantity": 1.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "BTC": {
+      "quantity": 0.009320143,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "CNP": {
+      "quantity": 4.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "COP": {
+      "quantity": 45.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "CSX": {
+      "quantity": 83.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "DUK": {
+      "quantity": 74.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "EA": {
+      "quantity": 18.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "ED": {
+      "quantity": 37.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "EQIX": {
+      "quantity": 20.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "GOOGL": {
+      "quantity": 62.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "HON": {
+      "quantity": 9.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "LMT": {
+      "quantity": 20.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "META": {
+      "quantity": 6.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "MSFT": {
+      "quantity": 27.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "NVDA": {
+      "quantity": 56.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "PM": {
+      "quantity": 1.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "ROL": {
+      "quantity": 6.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "UAL": {
+      "quantity": 15.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "VTR": {
+      "quantity": 5.0,
+      "price": 0.0,
+      "value": 0.0
+    },
+    "WELL": {
+      "quantity": 26.0,
+      "price": 0.0,
+      "value": 0.0
+    }
+  }
+}

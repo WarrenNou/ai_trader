@@ -416,6 +416,82 @@ def initialize_files():
             with open(log_file, "w") as f:
                 f.write(f"Log file created at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
 
+@app.route('/api/portfolio')
+def get_portfolio():
+    """Get detailed portfolio information"""
+    try:
+        # Get portfolio data from file
+        portfolio = {
+            "cash": 10000.00,
+            "equity": 5000.00,
+            "total_value": 15000.00,
+            "previous_cash": 10000.00,
+            "previous_equity": 5000.00,
+            "previous_total": 15000.00,
+            "positions": []
+        }
+        
+        # Try to load portfolio data from file
+        if os.path.exists("portfolio_data.json"):
+            with open("portfolio_data.json", "r") as f:
+                portfolio_data = json.load(f)
+                portfolio.update({
+                    "cash": portfolio_data.get("cash", 10000.00),
+                    "equity": portfolio_data.get("equity", 5000.00),
+                    "total_value": portfolio_data.get("total_value", 15000.00),
+                    "previous_cash": portfolio_data.get("previous_cash", portfolio_data.get("cash", 10000.00)),
+                    "previous_equity": portfolio_data.get("previous_equity", portfolio_data.get("equity", 5000.00)),
+                    "previous_total": portfolio_data.get("previous_total", portfolio_data.get("total_value", 15000.00))
+                })
+        
+        # Try to load portfolio state for positions
+        if os.path.exists("portfolio_state.json"):
+            with open("portfolio_state.json", "r") as f:
+                state_data = json.load(f)
+                
+                # Get positions
+                if "positions" in state_data:
+                    positions = []
+                    for symbol, position in state_data["positions"].items():
+                        # Try to get target allocation from stocks_config
+                        target_allocation = 0.0
+                        if os.path.exists("stocks_config.json"):
+                            with open("stocks_config.json", "r") as sc_file:
+                                stocks_config = json.load(sc_file)
+                                for stock in stocks_config:
+                                    if stock["symbol"] == symbol:
+                                        target_allocation = stock["weight"]
+                                        break
+                        
+                        # Calculate allocation
+                        allocation = position["value"] / state_data["portfolio_value"] if state_data["portfolio_value"] > 0 else 0
+                        
+                        positions.append({
+                            "symbol": symbol,
+                            "quantity": position["quantity"],
+                            "price": position["price"],
+                            "value": position["value"],
+                            "allocation": allocation,
+                            "target_allocation": target_allocation
+                        })
+                    
+                    portfolio["positions"] = positions
+        
+        # Force refresh from trading bot if running
+        if stock_bot_running and not stock_bot_paused:
+            # Log the refresh request
+            log_event("Portfolio refresh requested from dashboard", "neutral")
+            
+            # Update portfolio_data.json with latest data
+            # This would ideally trigger the trading bot to update the file
+            # For now, we'll just return what we have
+            
+        return jsonify(portfolio)
+    
+    except Exception as e:
+        print(f"Error getting portfolio data: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     

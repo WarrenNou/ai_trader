@@ -129,8 +129,11 @@
         <div class="row">
             <div class="col-md-12">
                 <div class="card portfolio-card">
-                    <div class="card-header">
+                    <div class="card-header d-flex justify-content-between align-items-center">
                         <h5><i class="bi bi-wallet2"></i> Portfolio Summary</h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshPortfolio()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh Portfolio
+                        </button>
                     </div>
                     <div class="card-body">
                         <div class="row" id="portfolio-summary">
@@ -148,6 +151,12 @@
                                 <p class="text-muted mb-1">Total Value</p>
                                 <p class="portfolio-value" id="total-value">$0.00</p>
                                 <p class="portfolio-change" id="total-change">+0.00% today</p>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <h6 class="mb-3">Portfolio Allocation</h6>
+                            <div id="portfolio-allocation" class="table-responsive">
+                                <p class="text-muted">Loading allocation data...</p>
                             </div>
                         </div>
                     </div>
@@ -266,7 +275,94 @@
             serverTimeElement.textContent = now.toLocaleString();
         }
 
-        // Fetch bot status periodically
+        // Function to refresh portfolio data
+        function refreshPortfolio() {
+            addLogEntry('Refreshing portfolio data...', 'neutral');
+            
+            // Show loading spinner in portfolio section
+            document.getElementById('portfolio-allocation').innerHTML = 
+                '<div class="text-center"><i class="bi bi-arrow-repeat spinner-border"></i> Refreshing portfolio data...</div>';
+            
+            fetch('/api/portfolio')
+                .then(response => response.json())
+                .then(data => {
+                    updatePortfolioDisplay(data);
+                    addLogEntry('Portfolio data refreshed successfully', 'positive');
+                })
+                .catch(error => {
+                    addLogEntry(`Error refreshing portfolio: ${error}`, 'negative');
+                    document.getElementById('portfolio-allocation').innerHTML = 
+                        '<p class="text-danger">Error loading portfolio data. Please try again.</p>';
+                });
+        }
+
+        // Update portfolio display with allocation data
+        function updatePortfolioDisplay(data) {
+            // Update summary values
+            document.getElementById('cash-value').textContent = `$${data.cash.toFixed(2)}`;
+            document.getElementById('equity-value').textContent = `$${data.equity.toFixed(2)}`;
+            document.getElementById('total-value').textContent = `$${data.total_value.toFixed(2)}`;
+            
+            // Calculate daily changes
+            const cashChange = ((data.cash / data.previous_cash) - 1) * 100;
+            const equityChange = ((data.equity / data.previous_equity) - 1) * 100;
+            const totalChange = ((data.total_value / data.previous_total) - 1) * 100;
+            
+            document.getElementById('cash-change').textContent = 
+                `${cashChange > 0 ? '+' : ''}${cashChange.toFixed(2)}% today`;
+            document.getElementById('cash-change').className = 
+                `portfolio-change ${cashChange >= 0 ? 'positive' : 'negative'}`;
+                
+            document.getElementById('equity-change').textContent = 
+                `${equityChange > 0 ? '+' : ''}${equityChange.toFixed(2)}% today`;
+            document.getElementById('equity-change').className = 
+                `portfolio-change ${equityChange >= 0 ? 'positive' : 'negative'}`;
+                
+            document.getElementById('total-change').textContent = 
+                `${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}% today`;
+            document.getElementById('total-change').className = 
+                `portfolio-change ${totalChange >= 0 ? 'positive' : 'negative'}`;
+            
+            // Update allocation table
+            if (data.positions && data.positions.length > 0) {
+                let allocationHtml = '<table class="table table-striped table-sm">';
+                allocationHtml += '<thead><tr><th>Symbol</th><th>Shares</th><th>Price</th><th>Value</th><th>Current %</th><th>Target %</th><th>Diff</th></tr></thead>';
+                allocationHtml += '<tbody>';
+                
+                data.positions.forEach(position => {
+                    const currentPct = position.allocation * 100;
+                    const targetPct = position.target_allocation * 100;
+                    const diff = currentPct - targetPct;
+                    
+                    // Determine color based on allocation difference
+                    let diffClass = 'neutral';
+                    if (Math.abs(diff) < 2.0) {
+                        diffClass = 'positive';
+                    } else if (Math.abs(diff) < 5.0) {
+                        diffClass = 'warning';
+                    } else {
+                        diffClass = 'negative';
+                    }
+                    
+                    allocationHtml += `<tr>
+                        <td>${position.symbol}</td>
+                        <td>${position.quantity}</td>
+                        <td>$${position.price.toFixed(2)}</td>
+                        <td>$${position.value.toFixed(2)}</td>
+                        <td>${currentPct.toFixed(1)}%</td>
+                        <td>${targetPct.toFixed(1)}%</td>
+                        <td class="${diffClass}">${diff > 0 ? '+' : ''}${diff.toFixed(1)}%</td>
+                    </tr>`;
+                });
+                
+                allocationHtml += '</tbody></table>';
+                document.getElementById('portfolio-allocation').innerHTML = allocationHtml;
+            } else {
+                document.getElementById('portfolio-allocation').innerHTML = '<p class="text-muted">No positions in portfolio</p>';
+            }
+        }
+
+        // Update status function (modified to include portfolio allocation)
         function updateStatus() {
             fetch('/api/status')
                 .then(response => response.json())
@@ -298,25 +394,10 @@
                         document.getElementById('equity-value').textContent = `$${data.portfolio.equity.toFixed(2)}`;
                         document.getElementById('total-value').textContent = `$${data.portfolio.total_value.toFixed(2)}`;
                         
-                        // Calculate daily changes (placeholder - would need actual daily change data)
-                        const cashChange = ((data.portfolio.cash / 10000) - 1) * 100;
-                        const equityChange = ((data.portfolio.equity / 5000) - 1) * 100;
-                        const totalChange = ((data.portfolio.total_value / 15000) - 1) * 100;
-                        
-                        document.getElementById('cash-change').textContent = 
-                            `${cashChange > 0 ? '+' : ''}${cashChange.toFixed(2)}% today`;
-                        document.getElementById('cash-change').className = 
-                            `portfolio-change ${cashChange >= 0 ? 'positive' : 'negative'}`;
-                            
-                        document.getElementById('equity-change').textContent = 
-                            `${equityChange > 0 ? '+' : ''}${equityChange.toFixed(2)}% today`;
-                        document.getElementById('equity-change').className = 
-                            `portfolio-change ${equityChange >= 0 ? 'positive' : 'negative'}`;
-                            
-                        document.getElementById('total-change').textContent = 
-                            `${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}% today`;
-                        document.getElementById('total-change').className = 
-                            `portfolio-change ${totalChange >= 0 ? 'positive' : 'negative'}`;
+                        // If we have allocation data, update the allocation table
+                        if (data.portfolio.positions) {
+                            updatePortfolioDisplay(data.portfolio);
+                        }
                     }
                     
                     // Update trades

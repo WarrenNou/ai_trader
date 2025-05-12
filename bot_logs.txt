@@ -35,3 +35,39 @@ Error during conversion: ChunkedEncodingError(ProtocolError('Response ended prem
 2025-05-12 13:20:00,606: INFO: [MLCryptoTrader] Current position: 0.009320143 BTC
 2025-05-12 13:20:00,607: INFO: [MLCryptoTrader] Not buying: Sentiment is positive, not negative (CONTRARIAN)
 2025-05-12 13:20:00,608: INFO: [MLCryptoTrader] Trading iteration ended at 2025-05-12 13:20:00, next check in time is 2025-05-12 13:21:00. Took 0.58s
+2025-05-12 13:21:00,209: INFO: [MLCryptoTrader] Not sending account summary to Discord because db_connection_str is not set
+2025-05-12 13:21:00,234: INFO: [MLCryptoTrader] Bot is running. Executing the on_trading_iteration lifecycle method at 2025-05-12 13:21:00
+2025-05-12 13:21:00,234: INFO: [MLCryptoTrader] Starting trading iteration at 2025-05-12 13:21:00.234575-04:00
+2025-05-12 13:21:00,270: INFO: [MLCryptoTrader] No entry price available for stop loss calculation
+2025-05-12 13:21:00,329: INFO: [MLCryptoTrader] Portfolio Value: $99420.40
+2025-05-12 13:21:00,329: INFO: [MLCryptoTrader] Cash: $98462.38
+2025-05-12 13:21:00,329: INFO: [MLCryptoTrader] Position Value: $958.44 (0.96% allocation)
+[33m0.9999120235443115, positive[39m
+2025-05-12 13:21:00,592: INFO: [MLCryptoTrader] Current position: 0.009320143 BTC
+2025-05-12 13:21:00,592: INFO: [MLCryptoTrader] Not buying: Sentiment is positive, not negative (CONTRARIAN)
+2025-05-12 13:21:00,592: INFO: [MLCryptoTrader] Trading iteration ended at 2025-05-12 13:21:00, next check in time is 2025-05-12 13:22:00. Took 0.56s
+2025-05-12 13:22:00,134: INFO: [MLCryptoTrader] Not sending account summary to Discord because db_connection_str is not set
+2025-05-12 13:22:00,146: INFO: [MLCryptoTrader] Bot is running. Executing the on_trading_iteration lifecycle method at 2025-05-12 13:22:00
+2025-05-12 13:22:00,146: INFO: [MLCryptoTrader] Starting trading iteration at 2025-05-12 13:22:00.146843-04:00
+2025-05-12 13:22:00,179: INFO: [MLCryptoTrader] No entry price available for stop loss calculation
+2025-05-12 13:22:00,237: INFO: [MLCryptoTrader] Portfolio Value: $99420.18
+2025-05-12 13:22:00,237: INFO: [MLCryptoTrader] Cash: $98462.38
+2025-05-12 13:22:00,237: INFO: [MLCryptoTrader] Position Value: $958.56 (0.96% allocation)
+[33m0.9999120235443115, positive[39m
+2025-05-12 13:22:00,479: INFO: [MLCryptoTrader] Current position: 0.009320143 BTC
+2025-05-12 13:22:00,479: INFO: [MLCryptoTrader] Not buying: Sentiment is positive, not negative (CONTRARIAN)
+2025-05-12 13:22:00,479: INFO: [MLCryptoTrader] Trading iteration ended at 2025-05-12 13:22:00, next check in time is 2025-05-12 13:23:00. Took 0.43s
+2025-05-12 13:23:00,124: INFO: [MLCryptoTrader] Not sending account summary to Discord because db_connection_str is not set
+2025-05-12 13:23:00,132: INFO: [MLCryptoTrader] Bot is running. Executing the on_trading_iteration lifecycle method at 2025-05-12 13:23:00
+2025-05-12 13:23:00,132: INFO: [MLCryptoTrader] Starting trading iteration at 2025-05-12 13:23:00.132425-04:00
+2025-05-12 13:23:00,170: INFO: [MLCryptoTrader] No entry price available for stop loss calculation
+2025-05-12 13:23:00,228: INFO: [MLCryptoTrader] Portfolio Value: $99419.15
+2025-05-12 13:23:00,228: INFO: [MLCryptoTrader] Cash: $98462.38
+2025-05-12 13:23:00,228: INFO: [MLCryptoTrader] Position Value: $957.42 (0.96% allocation)
+[33m0.9999120235443115, positive[39m
+2025-05-12 13:23:00,479: INFO: [MLCryptoTrader] Current position: 0.009320143 BTC
+2025-05-12 13:23:00,479: INFO: [MLCryptoTrader] Not buying: Sentiment is positive, not negative (CONTRARIAN)
+2025-05-12 13:23:00,480: INFO: [MLCryptoTrader] Trading iteration ended at 2025-05-12 13:23:00, next check in time is 2025-05-12 13:24:00. Took 0.45s
+2025-05-12 13:23:23,024: INFO: [MLCryptoTrader] Executing the on_abrupt_closing event method
+2025-05-12 13:23:23,024: INFO: Trading finished for MLCryptoTrader
+Breaking loop because should not continue.
