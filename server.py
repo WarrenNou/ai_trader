@@ -3,6 +3,7 @@ import os
 import subprocess
 import threading
 import time
+from flask import Flask, render_template, jsonify
 
 # Create Flask app with explicit template folder
 app = Flask(__name__, 

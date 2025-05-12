@@ -9,6 +9,8 @@ from alpaca_trade_api.rest import REST, TimeFrame  # Add TimeFrame here
 from finbert_utils import estimate_sentiment
 from colorama import Fore, init
 import numpy as np
+import json
+import os
 
 
 API_KEY = "PKJ172HF65HRI6Z7R8AA"
@@ -33,6 +35,9 @@ class MLTrader(Strategy):
         
         # Add stop loss tracking
         self.stop_loss_prices = {}  # Dictionary to track stop loss prices for positions
+        
+        # Load any saved stop loss data
+        self.load_stop_loss_data()
         
         # Log the change in sleep time
         self.log_message("Strategy configured to check every 1 minute for testing", color="green")
@@ -591,6 +596,8 @@ class MLTrader(Strategy):
                 # Remove the stop loss price from our dictionary
                 if position_key in self.stop_loss_prices:
                     del self.stop_loss_prices[position_key]
+                    # Save the updated stop loss data
+                    self.save_stop_loss_data()
                 
                 return True
             
@@ -616,7 +623,52 @@ class MLTrader(Strategy):
         
         self.log_message(f"Set stop loss for {position.symbol} at ${stop_loss_price:.2f} ({stop_loss_percentage*100:.0f}% below entry)", color="yellow")
         
+        # Save the updated stop loss data
+        self.save_stop_loss_data()
+        
         return stop_loss_price
+
+    def save_stop_loss_data(self):
+        """Save stop loss prices to a JSON file"""
+        try:
+            # Convert the stop loss prices to a serializable format
+            # (Asset objects can't be directly serialized to JSON)
+            serializable_data = {}
+            for key, value in self.stop_loss_prices.items():
+                serializable_data[key] = value
+            
+            # Save to a JSON file
+            with open(f"{self.coin}_stop_loss_data.json", "w") as f:
+                json.dump(serializable_data, f)
+            
+            self.log_message(f"Saved stop loss data to {self.coin}_stop_loss_data.json", color="green")
+            return True
+        except Exception as e:
+            self.log_message(f"Error saving stop loss data: {str(e)}", color="red")
+            return False
+
+    def load_stop_loss_data(self):
+        """Load stop loss prices from a JSON file"""
+        try:
+            # Check if the file exists
+            filename = f"{self.coin}_stop_loss_data.json"
+            if not os.path.exists(filename):
+                self.log_message(f"No stop loss data file found ({filename})", color="yellow")
+                return False
+            
+            # Load from the JSON file
+            with open(filename, "r") as f:
+                loaded_data = json.load(f)
+            
+            # Update the stop loss prices dictionary
+            self.stop_loss_prices.update(loaded_data)
+            
+            self.log_message(f"Loaded stop loss data from {filename}", color="green")
+            self.log_message(f"Stop loss prices: {self.stop_loss_prices}", color="cyan")
+            return True
+        except Exception as e:
+            self.log_message(f"Error loading stop loss data: {str(e)}", color="red")
+            return False
 
 
 if __name__ == "__main__":
@@ -625,6 +677,15 @@ if __name__ == "__main__":
     import logging
     from alpaca_trade_api import REST
     import time
+    import argparse
+    
+    # Set up argument parser for command line options
+    parser = argparse.ArgumentParser(description='Crypto Trading Bot with Sentiment Analysis')
+    parser.add_argument('--test', action='store_true', help='Run bracket order test before starting')
+    parser.add_argument('--coin', type=str, default='BTC', help='Coin to trade (default: BTC)')
+    parser.add_argument('--risk', type=float, default=0.40, help='Percentage of cash at risk per trade (default: 0.40)')
+    parser.add_argument('--backtest', action='store_true', help='Run in backtest mode instead of live trading')
+    args = parser.parse_args()
     
     # Set up logging
     logging.basicConfig(level=logging.INFO)
@@ -651,39 +712,75 @@ if __name__ == "__main__":
         broker = Alpaca(ALPACA_CREDS)
         
         # Parameters for the strategy
-        coin = "BTC"
-        coin_name = "bitcoin"
+        coin = args.coin
+        coin_name = coin.lower()  # Simple conversion for coin name
         
         # Create the strategy
         strategy = MLTrader(
             name="MLCryptoTrader",
             broker=broker,
             parameters={
-                "cash_at_risk": 0.40,  # Using 40% of available cash per trade
+                "cash_at_risk": args.risk,  # Using command line risk parameter
                 "coin": coin,
                 "coin_name": coin_name,
             }
         )
         
-        # Test bracket orders
-        print("\nTesting bracket orders with take profit and stop loss...")
-        test_result = strategy.test_bracket_orders()
+        # Run bracket order test if requested
+        if args.test:
+            print("\nTesting bracket orders with take profit and stop loss...")
+            test_result = strategy.test_bracket_orders()
+            
+            if test_result:
+                print(Fore.GREEN + "Bracket order test completed successfully!" + Fore.RESET)
+                print("The test has verified that:")
+                print("1. A market order can be created and filled")
+                print("2. A take profit order can be created at 50% gain")
+                print("3. For stop loss: Alpaca doesn't support stop orders for crypto")
+                print("   In a real strategy, you would need to monitor the price and create a limit order when needed")
+            else:
+                print(Fore.RED + "Bracket order test failed." + Fore.RESET)
+                print("Please check the logs for more information.")
+                exit(1)
         
-        if test_result:
-            print(Fore.GREEN + "Bracket order test completed successfully!" + Fore.RESET)
-            print("The test has verified that:")
-            print("1. A market order can be created and filled")
-            print("2. A take profit order can be created at 50% gain")
-            print("3. For stop loss: Alpaca doesn't support stop orders for crypto")
-            print("   In a real strategy, you would need to monitor the price and create a limit order when needed")
+        # Run in backtest mode if requested
+        if args.backtest:
+            from lumibot.backtesting import YahooDataBacktesting
+            from datetime import datetime
+            
+            # Set up backtest parameters
+            start_date = datetime(2023, 1, 1)
+            end_date = datetime.now()
+            
+            print(f"\nRunning backtest for {coin} from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+            
+            # Run backtest
+            results, strat_obj = MLTrader.run_backtest(
+                YahooDataBacktesting,
+                start_date,
+                end_date,
+                benchmark_asset=f"{coin}-USD", 
+                quote_asset=Asset(symbol="USD", asset_type="crypto"),
+                # More realistic fees
+                buy_trading_fees=[TradingFee(percent_fee=0.0035)],  # 0.35% is typical for crypto exchanges
+                sell_trading_fees=[TradingFee(percent_fee=0.0035)],
+                # Slippage to account for market impact
+                slippage_model=lambda price, order_side, size: price * (1 + (0.001 * (-1 if order_side == "buy" else 1))),
+                initial_capital=100000,
+                parameters={
+                    "cash_at_risk": args.risk,
+                    "coin": coin,
+                    "coin_name": coin_name,
+                }
+            )
+            
+            print(f"Backtest completed. Final portfolio value: ${results['portfolio_value'][-1]:.2f}")
+            print(f"Benchmark final value: ${results['benchmark_value'][-1]:.2f}")
+            print(f"Strategy return: {results['strategy_return'][-1]:.2%}")
+            print(f"Benchmark return: {results['benchmark_return'][-1]:.2%}")
+            
         else:
-            print(Fore.RED + "Bracket order test failed." + Fore.RESET)
-        
-        # Ask if the user wants to continue with the trading strategy
-        user_input = input("\nDo you want to start the trading strategy now? (y/n): ")
-        
-        if user_input.lower() == 'y':
-            # Create trader and run the strategy
+            # Create trader and run the strategy in live mode
             trader = Trader()
             trader.add_strategy(strategy)
             
@@ -694,8 +791,6 @@ if __name__ == "__main__":
             
             # Run the strategy in the main thread
             trader.run_all()
-        else:
-            print("Exiting without starting the trading strategy.")
             
     except Exception as e:
         print(f"Error during setup: {str(e)}")
