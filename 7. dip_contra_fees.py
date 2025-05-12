@@ -92,16 +92,6 @@ class MLTrader(Strategy):
             except Exception as e:
                 self.log_message(f"Error processing position {position.symbol}: {str(e)}", color="red")
         
-        # Write accurate portfolio data to file for the server to read
-        with open("portfolio_data.json", "w") as f:
-            import json
-            json.dump({
-                "cash": cash,
-                "equity": equity_value,
-                "total_value": portfolio_value,
-                "timestamp": str(self.get_datetime())
-            }, f)
-        
         # Log portfolio values for debugging
         self.log_message(f"Portfolio update: Cash=${cash:.2f}, Equity=${equity_value:.2f}, Total=${portfolio_value:.2f}")
         
@@ -110,32 +100,62 @@ class MLTrader(Strategy):
 
         # Add more logging throughout
         self.log_message(f"Current sentiment: {sentiment} with probability {probability:.4f}")
+        self.log_message(f"Cash: ${cash}, Last price: ${last_price}, Quantity: {quantity}")
 
         if last_price is None:
+            self.log_message("No price available, skipping trading decision", color="red")
             return
 
         print(Fore.YELLOW + f"{probability}, {sentiment}" + Fore.RESET)
         
         # Get current position if any
         position = self.get_position(Asset(symbol=self.coin, asset_type="crypto"))
+        if position is not None:
+            self.log_message(f"Current position: {position.quantity} {self.coin}")
+        else:
+            self.log_message(f"No current position in {self.coin}")
         
-        # Buy on negative sentiment (contrarian)
-        if sentiment == "negative" and probability > 0.95 and cash > last_price:
-            order = self.create_order(
-                self.coin,
-                quantity,
-                "buy",
-                type="bracket",
-                take_profit_price=last_price * 1.5,
-                stop_loss_price=last_price * 0.7,
-                quote=Asset(symbol="USD", asset_type="crypto"),
-            )
-            print(Fore.LIGHTMAGENTA_EX + f"BUY ORDER: {order}" + Fore.RESET)
-            self.submit_order(order)
-            self.last_trade = "buy"
+        # CHANGED: Buy on positive sentiment (following the trend)
+        if sentiment == "positive" and probability > 0.95 and quantity > 0:
+            self.log_message(f"Buy conditions met: Positive sentiment with {probability:.4f} probability", color="green")
+            
+            try:
+                # Calculate a very small quantity similar to the test trade method
+                # This seems to work for fractional orders
+                small_quantity = 1 / last_price  # About $1 worth
+                
+                # Scale up based on cash_at_risk
+                buy_quantity = small_quantity * (self.cash_at_risk * 100)  # Scale by cash_at_risk percentage
+                
+                self.log_message(f"Attempting to buy quantity: {buy_quantity} BTC", color="yellow")
+                
+                order = self.create_order(
+                    Asset(symbol=self.coin, asset_type="crypto"),  # Use Asset object
+                    buy_quantity,
+                    "buy",
+                    type="market",
+                    quote=Asset(symbol="USD", asset_type="crypto"),
+                )
+                self.log_message(f"BUY ORDER (POSITIVE SENTIMENT): {order}", color="green")
+                print(Fore.LIGHTMAGENTA_EX + f"BUY ORDER (POSITIVE SENTIMENT): {order}" + Fore.RESET)
+                self.submit_order(order)
+                self.last_trade = "buy"
+            except Exception as e:
+                self.log_message(f"Error placing buy order: {str(e)}", color="red")
+                print(Fore.RED + f"Error placing buy order: {str(e)}" + Fore.RESET)
+        else:
+            # Log why we didn't buy
+            if sentiment != "positive":
+                self.log_message(f"Not buying: Sentiment is {sentiment}, not positive", color="yellow")
+            elif probability <= 0.95:
+                self.log_message(f"Not buying: Probability {probability:.4f} is not > 0.95", color="yellow")
+            elif quantity <= 0:
+                self.log_message(f"Not buying: Calculated quantity {quantity} is too small", color="yellow")
+            else:
+                self.log_message("Not buying: Unknown reason", color="red")
         
-        # Sell on positive sentiment (contrarian)
-        elif sentiment == "positive" and probability > 0.95 and self.last_trade == "buy":
+        # CHANGED: Sell on negative sentiment (following the trend)
+        if sentiment == "negative" and probability > 0.95 and self.last_trade == "buy":
             if position is not None and position.quantity > 0:
                 order = self.create_order(
                     self.coin,
@@ -143,7 +163,7 @@ class MLTrader(Strategy):
                     "sell",
                     quote=Asset(symbol="USD", asset_type="crypto"),
                 )
-                print(Fore.LIGHTCYAN_EX + f"SELL ORDER: {order}" + Fore.RESET)
+                print(Fore.LIGHTCYAN_EX + f"SELL ORDER (NEGATIVE SENTIMENT): {order}" + Fore.RESET)
                 self.submit_order(order)
                 self.last_trade = "sell"
         
