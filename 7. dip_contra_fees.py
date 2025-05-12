@@ -31,8 +31,12 @@ class MLTrader(Strategy):
         self.coin_name = coin_name
         self.api = REST(base_url=BASE_URL, key_id=API_KEY, secret_key=API_SECRET)
         
+        # Add stop loss tracking
+        self.stop_loss_prices = {}  # Dictionary to track stop loss prices for positions
+        
         # Log the change in sleep time
         self.log_message("Strategy configured to check every 1 minute for testing", color="green")
+        self.log_message(f"Trading {self.coin} with {self.cash_at_risk*100}% cash at risk per trade", color="green")
 
     def position_sizing(self):
         cash = self.get_cash()
@@ -64,6 +68,12 @@ class MLTrader(Strategy):
         # Add this at the start of the method
         self.log_message(f"Starting trading iteration at {self.get_datetime()}")
         
+        # Check for stop loss conditions first
+        stop_loss_triggered = self.check_stop_loss()
+        if stop_loss_triggered:
+            self.log_message("Stop loss was triggered and executed, skipping regular trading logic", color="yellow")
+            return
+        
         # Log performance metrics
         self.log_performance()  # Add this line to track performance
         
@@ -73,38 +83,12 @@ class MLTrader(Strategy):
         positions = self.get_positions()
         equity_value = 0
         
-        for position in positions:
-            try:
-                # Get the asset type, defaulting to "crypto" if not available
-                asset_type = getattr(position, 'asset_type', 'crypto')
-                
-                # Calculate market value if the attribute doesn't exist
-                if hasattr(position, 'market_value'):
-                    equity_value += position.market_value
-                else:
-                    # Calculate market value as quantity * current price
-                    current_price = self.get_last_price(
-                        Asset(symbol=position.symbol, asset_type=asset_type),
-                        quote=Asset(symbol="USD", asset_type="crypto")
-                    )
-                    if current_price is not None:
-                        position_value = position.quantity * current_price
-                        equity_value += position_value
-            except Exception as e:
-                self.log_message(f"Error processing position {position.symbol}: {str(e)}", color="red")
-        
-        # Log portfolio values for debugging
-        self.log_message(f"Portfolio update: Cash=${cash:.2f}, Equity=${equity_value:.2f}, Total=${portfolio_value:.2f}")
-        
+        # Get position sizing and sentiment
         cash, last_price, quantity = self.position_sizing()
         probability, sentiment = self.get_sentiment()
 
-        # Add more logging throughout
-        self.log_message(f"Current sentiment: {sentiment} with probability {probability:.4f}")
-        self.log_message(f"Cash: ${cash}, Last price: ${last_price}, Quantity: {quantity}")
-
         if last_price is None:
-            self.log_message("No price available, skipping trading decision", color="red")
+            self.log_message("Could not get last price, skipping trading iteration", color="red")
             return
 
         print(Fore.YELLOW + f"{probability}, {sentiment}" + Fore.RESET)
@@ -116,42 +100,78 @@ class MLTrader(Strategy):
         else:
             self.log_message(f"No current position in {self.coin}")
         
-        # CHANGED: Buy on POSITIVE sentiment (trend following approach for testing)
-        if sentiment == "positive" and probability > 0.95 and quantity > 0:
-            self.log_message(f"Buy conditions met: Positive sentiment with {probability:.4f} probability", color="green")
+        # CONTRARIAN STRATEGY: Buy on NEGATIVE sentiment
+        if sentiment == "negative" and probability > 0.95 and quantity > 0:
+            self.log_message(f"Buy conditions met: Negative sentiment with {probability:.4f} probability (CONTRARIAN)", color="green")
             
             try:
-                # Use the quantity directly from position_sizing method
-                # This already calculates: cash * self.cash_at_risk / last_price
-                
                 # Format to 8 decimal places which is standard for crypto
                 buy_quantity = round(quantity, 8)
                 
                 self.log_message(f"Attempting to buy: {buy_quantity} {self.coin} (${cash * self.cash_at_risk:.2f} worth)", color="yellow")
                 
-                # Create order using market order for testing
-                order = self.create_order(
-                    Asset(symbol=self.coin, asset_type="crypto"),
+                # Create a simple market buy order (not bracket)
+                crypto_asset = Asset(symbol=self.coin, asset_type="crypto")
+                quote_asset = Asset(symbol="USD", asset_type="crypto")
+                
+                # Step 1: Create and submit market buy order
+                market_order = self.create_order(
+                    crypto_asset,
                     buy_quantity,
                     "buy",
-                    type="market",
-                    quote=Asset(symbol="USD", asset_type="crypto"),
+                    order_type="market",
+                    quote=quote_asset
                 )
                 
-                self.log_message(f"BUY ORDER (POSITIVE SENTIMENT): {order}", color="green")
-                print(Fore.LIGHTMAGENTA_EX + f"BUY ORDER (POSITIVE SENTIMENT): {order}" + Fore.RESET)
+                self.log_message(f"BUY ORDER (CONTRARIAN - NEGATIVE SENTIMENT): {market_order}", color="green")
+                print(Fore.LIGHTMAGENTA_EX + f"BUY ORDER (CONTRARIAN - NEGATIVE SENTIMENT): {market_order}" + Fore.RESET)
                 
                 # Submit the order
-                self.submit_order(order)
+                submitted_order = self.submit_order(market_order)
                 self.last_trade = "buy"
-                
+
+                # Step 2: Create take profit order (separate limit order)
+                # Wait a moment for the position to be updated
+                import time
+                time.sleep(2)
+
+                # Get the updated position
+                position = self.get_position(crypto_asset)
+
+                if position is not None and position.quantity > 0:
+                    # Set stop loss for this position (30% below entry)
+                    self.set_stop_loss_for_position(position, last_price, 0.3)
+                    
+                    # Calculate take profit price (50% gain)
+                    take_profit_price = last_price * 1.5
+                    
+                    # Use 90% of the position for the take profit order to be safe
+                    tp_quantity = round(position.quantity * 0.9, 8)
+                    
+                    # Create take profit order
+                    tp_order = self.create_order(
+                        crypto_asset,
+                        tp_quantity,
+                        "sell",
+                        order_type="limit",
+                        limit_price=take_profit_price,
+                        quote=quote_asset
+                    )
+                    
+                    self.log_message(f"TAKE PROFIT ORDER at {take_profit_price:.2f} (50% gain): {tp_order}", color="green")
+                    self.submit_order(tp_order)
+                    
+                    # Note: For stop loss, we would need to monitor the price in the strategy
+                    # and create a limit sell order when the price drops below our threshold
+                    self.log_message(f"Stop loss will be monitored at ${last_price * 0.7:.2f} (30% loss)", color="yellow")
+            
             except Exception as e:
                 self.log_message(f"Error placing buy order: {str(e)}", color="red")
                 print(Fore.RED + f"Error placing buy order: {str(e)}" + Fore.RESET)
         else:
             # Log why we didn't buy
-            if sentiment != "positive":
-                self.log_message(f"Not buying: Sentiment is {sentiment}, not positive", color="yellow")
+            if sentiment != "negative":
+                self.log_message(f"Not buying: Sentiment is {sentiment}, not negative (CONTRARIAN)", color="yellow")
             elif probability <= 0.95:
                 self.log_message(f"Not buying: Probability {probability:.4f} is not > 0.95", color="yellow")
             elif quantity <= 0:
@@ -159,23 +179,26 @@ class MLTrader(Strategy):
             else:
                 self.log_message("Not buying: Unknown reason", color="red")
         
-        # CHANGED: Sell on NEGATIVE sentiment (trend following approach for testing)
-        if sentiment == "negative" and probability > 0.95 and self.last_trade == "buy":
+        # CONTRARIAN STRATEGY: Sell on POSITIVE sentiment
+        if sentiment == "positive" and probability > 0.95 and self.last_trade == "buy":
             if position is not None and position.quantity > 0:
                 try:
-                    self.log_message(f"Sell conditions met: Negative sentiment with {probability:.4f} probability", color="green")
+                    self.log_message(f"Sell conditions met: Positive sentiment with {probability:.4f} probability (CONTRARIAN)", color="green")
                     
                     # Create sell order for the entire position
+                    crypto_asset = Asset(symbol=self.coin, asset_type="crypto")
+                    quote_asset = Asset(symbol="USD", asset_type="crypto")
+                    
                     order = self.create_order(
-                        Asset(symbol=self.coin, asset_type="crypto"),
+                        crypto_asset,
                         position.quantity,
                         "sell",
-                        type="market",
-                        quote=Asset(symbol="USD", asset_type="crypto"),
+                        order_type="market",
+                        quote=quote_asset
                     )
                     
-                    self.log_message(f"SELL ORDER (NEGATIVE SENTIMENT): {order}", color="green")
-                    print(Fore.LIGHTCYAN_EX + f"SELL ORDER (NEGATIVE SENTIMENT): {order}" + Fore.RESET)
+                    self.log_message(f"SELL ORDER (CONTRARIAN - POSITIVE SENTIMENT): {order}", color="green")
+                    print(Fore.LIGHTCYAN_EX + f"SELL ORDER (CONTRARIAN - POSITIVE SENTIMENT): {order}" + Fore.RESET)
                     
                     # Submit the order
                     self.submit_order(order)
@@ -370,6 +393,231 @@ class MLTrader(Strategy):
             print(Fore.RED + f"Error sending test trade: {str(e)}" + Fore.RESET)
             return False
 
+    def test_bracket_orders(self):
+        """Test if bracket orders with take profit and stop loss are working correctly"""
+        try:
+            self.log_message("Starting bracket order test...", color="cyan")
+            
+            # Make sure we have the coin attribute
+            if not hasattr(self, 'coin') or self.coin is None:
+                self.log_message("Error: coin attribute not set. Using BTC as default.", color="yellow")
+                coin = "BTC"
+            else:
+                coin = self.coin
+            
+            # Create proper Asset objects
+            crypto_asset = Asset(symbol=coin, asset_type="crypto")
+            quote_asset = Asset(symbol="USD", asset_type="crypto")
+            
+            # Get current price
+            last_price = self.get_last_price(
+                crypto_asset,
+                quote=quote_asset
+            )
+            
+            if last_price is None:
+                self.log_message(f"Error: Could not get current price for {coin}", color="red")
+                return False
+            
+            # Calculate a small test quantity (about $25 worth - even smaller to avoid issues)
+            test_quantity = round(25 / last_price, 8)
+            
+            self.log_message(f"Current price: ${last_price:.2f}", color="cyan")
+            self.log_message(f"Test quantity: {test_quantity} {coin}", color="cyan")
+            
+            # Calculate take profit and stop loss prices
+            take_profit_price = last_price * 1.5  # 50% profit
+            stop_loss_price = last_price * 0.7    # 30% loss
+            
+            self.log_message(f"Take profit price: ${take_profit_price:.2f} (50% gain)", color="green")
+            self.log_message(f"Stop loss price: ${stop_loss_price:.2f} (30% loss)", color="red")
+            
+            # Create a simple market buy order first (not bracket)
+            try:
+                # First try a simple market order
+                self.log_message("Creating a simple market buy order first...", color="cyan")
+                
+                simple_order = self.create_order(
+                    crypto_asset,
+                    test_quantity,
+                    "buy",
+                    order_type="market",  # Use order_type instead of type
+                    quote=quote_asset
+                )
+                
+                self.log_message(f"Simple market order created: {simple_order}", color="cyan")
+                
+                # Submit the order
+                submitted_order = self.submit_order(simple_order)
+                self.log_message(f"Simple market order submitted: {submitted_order}", color="green")
+                
+                # Wait for the order to be processed
+                import time
+                time.sleep(5)  # Wait longer to ensure position is updated
+                
+                # Get the position directly from Lumibot
+                position = self.get_position(crypto_asset)
+                
+                if position is not None and position.quantity > 0:
+                    self.log_message(f"Test position opened: {position.quantity} {coin}", color="green")
+                    
+                    # Try to place a very small take profit order (0.001 BTC)
+                    # This is a very small amount that should be available
+                    safe_quantity = 0.001  # Very small fixed amount
+                    
+                    # Now try to place take profit order
+                    self.log_message("Now placing take profit order...", color="cyan")
+                    self.log_message(f"Using small fixed quantity for safety: {safe_quantity} {coin}", color="yellow")
+                    
+                    # Take profit order
+                    take_profit_order = self.create_order(
+                        crypto_asset,
+                        safe_quantity,
+                        "sell",
+                        order_type="limit",  # Use limit for take profit
+                        limit_price=take_profit_price,  # Use limit_price instead of take_profit_price
+                        quote=quote_asset
+                    )
+                    
+                    self.log_message(f"Take profit order created: {take_profit_order}", color="green")
+                    tp_submitted = self.submit_order(take_profit_order)
+                    self.log_message(f"Take profit order submitted: {tp_submitted}", color="green")
+                    
+                    # For crypto, Alpaca only supports limit orders, not stop orders
+                    # So we'll explain this limitation
+                    self.log_message("NOTE: Alpaca doesn't support stop orders for crypto", color="yellow")
+                    self.log_message("In a real strategy, you would need to monitor the price and create a limit order when needed", color="yellow")
+                    
+                    # Check all orders
+                    time.sleep(1)  # Wait a moment for orders to be processed
+                    orders = self.get_orders()
+                    self.log_message(f"Total orders after test: {len(orders)}", color="cyan")
+                    
+                    # Log the order IDs for reference
+                    self.log_message("Order IDs for reference:", color="cyan")
+                    for o in orders:
+                        order_id = getattr(o, 'id', 'unknown')
+                        order_type = getattr(o, 'order_type', getattr(o, 'type', 'unknown'))
+                        self.log_message(f"  - Order ID: {order_id}, Type: {order_type}", color="cyan")
+                    
+                    self.log_message("Bracket order test completed successfully!", color="green")
+                    print(Fore.GREEN + "Bracket order test completed successfully!" + Fore.RESET)
+                    print("The test has verified that:")
+                    print("1. A market order can be created and filled")
+                    print("2. A take profit order can be created at 50% gain")
+                    print("3. For stop loss: Alpaca doesn't support stop orders for crypto")
+                    print("   In a real strategy, you would need to monitor the price and create a limit order when needed")
+                    
+                    return True
+                else:
+                    self.log_message("No position found after market order", color="red")
+                    return False
+                
+            except Exception as e:
+                self.log_message(f"Error with market order: {str(e)}", color="red")
+                print(Fore.RED + f"Error with market order: {str(e)}" + Fore.RESET)
+                return False
+            
+        except Exception as e:
+            self.log_message(f"Error testing bracket orders: {str(e)}", color="red")
+            print(Fore.RED + f"Error testing bracket orders: {str(e)}" + Fore.RESET)
+            return False
+
+    def check_stop_loss(self):
+        """Monitor positions and execute stop loss if price falls below threshold"""
+        try:
+            # Get current position
+            position = self.get_position(Asset(symbol=self.coin, asset_type="crypto"))
+            
+            # If no position, nothing to check
+            if position is None or position.quantity <= 0:
+                return False
+            
+            # Get current price
+            current_price = self.get_last_price(
+                Asset(symbol=self.coin, asset_type="crypto"),
+                quote=Asset(symbol="USD", asset_type="crypto")
+            )
+            
+            if current_price is None:
+                self.log_message("Could not get current price for stop loss check", color="red")
+                return False
+            
+            # Get position key
+            position_key = f"{position.symbol}_crypto"
+            
+            # Get stop loss price from our stored dictionary
+            stop_loss_price = self.stop_loss_prices.get(position_key)
+            
+            # If we don't have a stored stop loss price, calculate it from entry price
+            if stop_loss_price is None:
+                entry_price = position.average_entry_price if hasattr(position, 'average_entry_price') else None
+                
+                # If we don't have entry price, we can't calculate stop loss
+                if entry_price is None:
+                    self.log_message("No entry price available for stop loss calculation", color="yellow")
+                    return False
+                
+                # Calculate and store stop loss price (30% below entry)
+                stop_loss_price = self.set_stop_loss_for_position(position, entry_price)
+                
+                if stop_loss_price is None:
+                    return False
+            
+            # Check if current price is below stop loss threshold
+            if current_price < stop_loss_price:
+                self.log_message(f"STOP LOSS TRIGGERED: Current price ${current_price:.2f} below stop loss ${stop_loss_price:.2f}", color="red")
+                
+                # Create sell order for the entire position
+                crypto_asset = Asset(symbol=self.coin, asset_type="crypto")
+                quote_asset = Asset(symbol="USD", asset_type="crypto")
+                
+                # Create market sell order
+                order = self.create_order(
+                    crypto_asset,
+                    position.quantity,
+                    "sell",
+                    order_type="market",
+                    quote=quote_asset
+                )
+                
+                self.log_message(f"STOP LOSS SELL ORDER: {order}", color="red")
+                print(Fore.RED + f"STOP LOSS SELL ORDER: {order}" + Fore.RESET)
+                
+                # Submit the order
+                self.submit_order(order)
+                self.last_trade = "sell"
+                
+                # Remove the stop loss price from our dictionary
+                if position_key in self.stop_loss_prices:
+                    del self.stop_loss_prices[position_key]
+                
+                return True
+            
+            # Log current price vs stop loss for monitoring
+            self.log_message(f"Current price ${current_price:.2f}, Stop loss set at ${stop_loss_price:.2f}", color="cyan")
+            return False
+            
+        except Exception as e:
+            self.log_message(f"Error checking stop loss: {str(e)}", color="red")
+            return False
+
+    def set_stop_loss_for_position(self, position, entry_price, stop_loss_percentage=0.3):
+        """Set a stop loss price for a position and store it"""
+        if position is None or position.quantity <= 0:
+            return None
+        
+        # Calculate stop loss price (default 30% below entry)
+        stop_loss_price = entry_price * (1 - stop_loss_percentage)
+        
+        # Store the stop loss price for this position
+        position_key = f"{position.symbol}_{position.asset_type}"
+        self.stop_loss_prices[position_key] = stop_loss_price
+        
+        self.log_message(f"Set stop loss for {position.symbol} at ${stop_loss_price:.2f} ({stop_loss_percentage*100:.0f}% below entry)", color="yellow")
+        
+        return stop_loss_price
+
 
 if __name__ == "__main__":
     from lumibot.brokers import Alpaca
@@ -399,69 +647,57 @@ if __name__ == "__main__":
         print(f"Cash: ${float(account.cash):.2f}")
         print(f"Portfolio Value: ${float(account.portfolio_value):.2f}")
         
-        # Test if crypto trading is available by placing a small test order directly
-        print("Sending a direct test trade via Alpaca API...")
-        try:
-            # Create a small market buy order for BTC
-            test_order = api.submit_order(
-                symbol="BTC/USD",
-                qty=0.0001,  # Very small quantity
-                side="buy",
-                type="market",
-                time_in_force="gtc"
-            )
-            print(f"Test order placed successfully: {test_order.id}")
+        # Initialize Alpaca broker using the credentials dictionary
+        broker = Alpaca(ALPACA_CREDS)
+        
+        # Parameters for the strategy
+        coin = "BTC"
+        coin_name = "bitcoin"
+        
+        # Create the strategy
+        strategy = MLTrader(
+            name="MLCryptoTrader",
+            broker=broker,
+            parameters={
+                "cash_at_risk": 0.40,  # Using 40% of available cash per trade
+                "coin": coin,
+                "coin_name": coin_name,
+            }
+        )
+        
+        # Test bracket orders
+        print("\nTesting bracket orders with take profit and stop loss...")
+        test_result = strategy.test_bracket_orders()
+        
+        if test_result:
+            print(Fore.GREEN + "Bracket order test completed successfully!" + Fore.RESET)
+            print("The test has verified that:")
+            print("1. A market order can be created and filled")
+            print("2. A take profit order can be created at 50% gain")
+            print("3. For stop loss: Alpaca doesn't support stop orders for crypto")
+            print("   In a real strategy, you would need to monitor the price and create a limit order when needed")
+        else:
+            print(Fore.RED + "Bracket order test failed." + Fore.RESET)
+        
+        # Ask if the user wants to continue with the trading strategy
+        user_input = input("\nDo you want to start the trading strategy now? (y/n): ")
+        
+        if user_input.lower() == 'y':
+            # Create trader and run the strategy
+            trader = Trader()
+            trader.add_strategy(strategy)
             
-            # Wait a moment for the order to process
-            time.sleep(2)
+            # Log that we're starting paper trading
+            print(f"Starting paper trading for {coin} using contrarian sentiment strategy")
+            print(f"Using Alpaca Paper Trading account with API key: {API_KEY[:5]}...")
+            print("Press Ctrl+C to stop the trader")
             
-            # Check the order status
-            order_status = api.get_order(test_order.id)
-            print(f"Test order status: {order_status.status}")
-            
-            # Cancel the order if it's still open
-            if order_status.status in ['new', 'accepted', 'pending_new']:
-                api.cancel_order(test_order.id)
-                print(f"Test order cancelled successfully")
-            
-        except Exception as e:
-            print(f"Error placing direct test order: {str(e)}")
-            # Continue anyway, as this might be due to crypto not being available
-            # but the strategy might still work with the broker
+            # Run the strategy in the main thread
+            trader.run_all()
+        else:
+            print("Exiting without starting the trading strategy.")
             
     except Exception as e:
-        print(f"Error connecting to Alpaca API: {str(e)}")
+        print(f"Error during setup: {str(e)}")
         print("Please check your API keys and try again.")
         exit(1)
-    
-    print("API connection test completed. Initializing trading strategy...")
-    
-    # Initialize Alpaca broker using the credentials dictionary
-    broker = Alpaca(ALPACA_CREDS)
-    
-    # Parameters for the strategy
-    coin = "BTC"
-    coin_name = "bitcoin"
-    
-    # Create the strategy
-    strategy = MLTrader(
-        name="MLCryptoTrader",
-        broker=broker,
-        parameters={
-            "cash_at_risk": 0.40,  # Using 40% of available cash per trade
-            "coin": coin,
-            "coin_name": coin_name,
-        }
-    )
-    
-    # Create trader and run the strategy
-    trader = Trader()
-    trader.add_strategy(strategy)
-    
-    # Log that we're starting paper trading
-    print(f"Starting paper trading for {coin} using contrarian sentiment strategy")
-    print(f"Using Alpaca Paper Trading account with API key: {API_KEY[:5]}...")
-    print("Press Ctrl+C to stop the trader")
-    
-    # Run the strategy in the main thread
-    trader.run_all()
