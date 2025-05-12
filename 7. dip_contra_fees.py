@@ -23,12 +23,15 @@ class MLTrader(Strategy):
         self, coin: str = "LTC", coin_name: str = "litecoin", cash_at_risk: float = 0.2
     ):
         self.set_market("24/7")
-        self.sleeptime = "5H"
+        self.sleeptime = "1M"  # Changed from 5H to 1M for faster testing
         self.last_trade = None
         self.cash_at_risk = cash_at_risk
         self.coin = coin
         self.coin_name = coin_name
         self.api = REST(base_url=BASE_URL, key_id=API_KEY, secret_key=API_SECRET)
+        
+        # Log the change in sleep time
+        self.log_message("Strategy configured to check every 1 minute for testing", color="green")
 
     def position_sizing(self):
         cash = self.get_cash()
@@ -70,7 +73,24 @@ class MLTrader(Strategy):
         equity_value = 0
         
         for position in positions:
-            equity_value += position.market_value
+            try:
+                # Get the asset type, defaulting to "crypto" if not available
+                asset_type = getattr(position, 'asset_type', 'crypto')
+                
+                # Calculate market value if the attribute doesn't exist
+                if hasattr(position, 'market_value'):
+                    equity_value += position.market_value
+                else:
+                    # Calculate market value as quantity * current price
+                    current_price = self.get_last_price(
+                        Asset(symbol=position.symbol, asset_type=asset_type),
+                        quote=Asset(symbol="USD", asset_type="crypto")
+                    )
+                    if current_price is not None:
+                        position_value = position.quantity * current_price
+                        equity_value += position_value
+            except Exception as e:
+                self.log_message(f"Error processing position {position.symbol}: {str(e)}", color="red")
         
         # Write accurate portfolio data to file for the server to read
         with open("portfolio_data.json", "w") as f:
@@ -213,7 +233,22 @@ class MLTrader(Strategy):
             cash = self.get_cash()
             
             # Calculate metrics
-            position_value = 0 if position is None else position.market_value
+            position_value = 0
+            if position is not None:
+                # Calculate position value if market_value attribute doesn't exist
+                if hasattr(position, 'market_value'):
+                    position_value = position.market_value
+                else:
+                    # Get the asset type, defaulting to "crypto" if not available
+                    asset_type = getattr(position, 'asset_type', 'crypto')
+                    
+                    current_price = self.get_last_price(
+                        Asset(symbol=position.symbol, asset_type=asset_type),
+                        quote=Asset(symbol="USD", asset_type="crypto")
+                    )
+                    if current_price is not None:
+                        position_value = position.quantity * current_price
+            
             allocation = 0 if portfolio_value == 0 else position_value / portfolio_value
             
             # Log the information
@@ -249,7 +284,7 @@ class MLTrader(Strategy):
                 return
                 
             # Calculate a very small quantity (about $10 worth)
-            quantity = 10 / last_price
+            quantity = 1 / last_price
             
             # Create a market buy order
             order = self.create_order(
