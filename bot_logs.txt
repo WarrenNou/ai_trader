@@ -1,0 +1,37 @@
+Log file created at 2025-05-12 13:17:37
+2025-05-12 13:19:25 | lumibot.credentials | INFO | .env file loaded from: /Users/wnoubi/DEV/LLMAgentCrypto/.env
+/opt/homebrew/Caskroom/miniforge/base/envs/ml-env/lib/python3.11/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
+  return self.fget.__get__(instance, owner)()
+2025-05-12 13:19:29 | asyncio | INFO | [unknown] Waiting for the socket stream connection to be established, 
+                method _stream_established must be called
+2025-05-12 13:19:29 | alpaca.trading.stream | INFO | started trading stream
+2025-05-12 13:19:29 | alpaca.trading.stream | INFO | starting trading websocket connection
+2025-05-12 13:19:29 | alpaca.trading.stream | INFO | connected to: BaseURL.TRADING_STREAM_PAPER
+Testing connection to Alpaca API...
+Successfully connected to Alpaca!
+Account ID: abc5a06b-d726-4153-9e5a-45b26ea8b3f9
+Account Status: ACTIVE
+Cash: $98462.38
+Portfolio Value: $99422.29
+Starting paper trading for BTC using contrarian sentiment strategy
+Using Alpaca Paper Trading account with API key: PKJ17...
+Press Ctrl+C to stop the trader
+2025-05-12 13:19:29,209: INFO: [MLCryptoTrader] Strategy MLCryptoTrader is initializing
+2025-05-12 13:19:29,209: INFO: [MLCryptoTrader] Executing the initialize lifecycle method
+2025-05-12 13:19:29,210: INFO: [MLCryptoTrader] No stop loss data file found (BTC_stop_loss_data.json)
+2025-05-12 13:19:29,210: INFO: [MLCryptoTrader] Strategy configured to check every 1 minute for testing
+2025-05-12 13:19:29,210: INFO: [MLCryptoTrader] Trading BTC with 40.0% cash at risk per trade
+Error during conversion: ChunkedEncodingError(ProtocolError('Response ended prematurely'))
+2025-05-12 13:19:29,529: INFO: [MLCryptoTrader] Strategy will check in again at: 2025-05-12 13:20:00 EDT
+2025-05-12 13:19:29,563: INFO: [MLCryptoTrader] Executing the before_market_opens lifecycle method
+2025-05-12 13:20:00,125: INFO: [MLCryptoTrader] Not sending account summary to Discord because db_connection_str is not set
+2025-05-12 13:20:00,125: INFO: [MLCryptoTrader] Bot is running. Executing the on_trading_iteration lifecycle method at 2025-05-12 13:20:00
+2025-05-12 13:20:00,125: INFO: [MLCryptoTrader] Starting trading iteration at 2025-05-12 13:20:00.125401-04:00
+2025-05-12 13:20:00,246: INFO: [MLCryptoTrader] No entry price available for stop loss calculation
+2025-05-12 13:20:00,275: INFO: [MLCryptoTrader] Portfolio Value: $99422.29
+2025-05-12 13:20:00,275: INFO: [MLCryptoTrader] Cash: $98462.38
+2025-05-12 13:20:00,275: INFO: [MLCryptoTrader] Position Value: $959.51 (0.97% allocation)
+[33m0.9999120235443115, positive[39m
+2025-05-12 13:20:00,606: INFO: [MLCryptoTrader] Current position: 0.009320143 BTC
+2025-05-12 13:20:00,607: INFO: [MLCryptoTrader] Not buying: Sentiment is positive, not negative (CONTRARIAN)
+2025-05-12 13:20:00,608: INFO: [MLCryptoTrader] Trading iteration ended at 2025-05-12 13:20:00, next check in time is 2025-05-12 13:21:00. Took 0.58s

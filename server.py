@@ -3,7 +3,8 @@ import os
 import subprocess
 import threading
 import time
-from flask import Flask, render_template, jsonify
+import json
+from flask import Flask, render_template, jsonify, request
 
 # Create Flask app with explicit template folder
 app = Flask(__name__, 
@@ -16,6 +17,19 @@ crypto_bot_running = False
 stock_bot_running = False
 crypto_bot_paused = False
 stock_bot_paused = False
+
+# Configuration for bots
+crypto_config = {
+    "coin": "BTC",
+    "risk": 0.40,
+    "strategy": "Contrarian Sentiment"
+}
+
+stock_config = {
+    "symbols": ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"],
+    "risk": 0.30,
+    "strategy": "Multi-Stock Sentiment"
+}
 
 @app.route('/')
 def home():
@@ -103,6 +117,10 @@ def stop_bot(bot_type):
         
         crypto_bot_running = False
         crypto_bot_paused = False
+        
+        # Log the stop event
+        log_event("Crypto bot stopped by user", "neutral")
+        
         return "Crypto trading bot stopped!"
     
     elif bot_type == 'stock':
@@ -118,6 +136,10 @@ def stop_bot(bot_type):
         
         stock_bot_running = False
         stock_bot_paused = False
+        
+        # Log the stop event
+        log_event("Stock bot stopped by user", "neutral")
+        
         return "Stock trading bot stopped!"
     
     else:
@@ -137,7 +159,6 @@ def get_status():
     try:
         if os.path.exists("bot_status.json"):
             with open("bot_status.json", "r") as f:
-                import json
                 status_data = json.load(f)
                 crypto_last_started = status_data.get("crypto_last_started")
                 stock_last_started = status_data.get("stock_last_started")
@@ -154,7 +175,6 @@ def get_status():
     try:
         if os.path.exists("portfolio_data.json"):
             with open("portfolio_data.json", "r") as f:
-                import json
                 portfolio_data = json.load(f)
                 portfolio = {
                     "cash": portfolio_data.get("cash", 10000.00),
@@ -191,6 +211,18 @@ def get_status():
                         log_type = "negative"
                     logs.append({"message": f"[Stock] {line.strip()}", "type": log_type})
         
+        # Get server logs
+        if os.path.exists("server_logs.txt"):
+            with open("server_logs.txt", "r") as f:
+                log_lines = f.readlines()[-5:]  # Get last 5 lines
+                for line in log_lines:
+                    log_type = "neutral"
+                    if "error" in line.lower() or "failed" in line.lower():
+                        log_type = "negative"
+                    elif "success" in line.lower() or "started" in line.lower():
+                        log_type = "positive"
+                    logs.append({"message": f"[Server] {line.strip()}", "type": log_type})
+        
         # Sort logs by timestamp if possible
         logs.sort(key=lambda x: x["message"], reverse=True)
         
@@ -202,7 +234,6 @@ def get_status():
     try:
         if os.path.exists("trades.json"):
             with open("trades.json", "r") as f:
-                import json
                 trades = json.load(f)
     except Exception as e:
         print(f"Error reading trades data: {str(e)}")
@@ -212,10 +243,62 @@ def get_status():
         "stock_status": stock_status,
         "crypto_last_started": crypto_last_started,
         "stock_last_started": stock_last_started,
+        "crypto_config": crypto_config,
+        "stock_config": stock_config,
         "portfolio": portfolio,
         "trades": trades,
         "logs": logs
     })
+
+@app.route('/api/config', methods=['GET', 'POST'])
+def bot_config():
+    global crypto_config, stock_config
+    
+    if request.method == 'POST':
+        data = request.json
+        bot_type = data.get('bot_type')
+        
+        if bot_type == 'crypto':
+            # Update crypto bot configuration
+            if 'coin' in data:
+                crypto_config['coin'] = data['coin']
+            if 'risk' in data:
+                crypto_config['risk'] = float(data['risk'])
+            
+            # Log the configuration change
+            log_event(f"Crypto bot configuration updated: {crypto_config}", "neutral")
+            
+            return jsonify({"status": "success", "message": "Crypto bot configuration updated"})
+            
+        elif bot_type == 'stock':
+            # Update stock bot configuration
+            if 'symbols' in data:
+                stock_config['symbols'] = data['symbols']
+            if 'risk' in data:
+                stock_config['risk'] = float(data['risk'])
+            
+            # Log the configuration change
+            log_event(f"Stock bot configuration updated: {stock_config}", "neutral")
+            
+            return jsonify({"status": "success", "message": "Stock bot configuration updated"})
+        
+        else:
+            return jsonify({"status": "error", "message": "Invalid bot type"})
+    
+    # Return current configuration
+    return jsonify({
+        "crypto": crypto_config,
+        "stock": stock_config
+    })
+
+def log_event(message, log_type="neutral"):
+    """Log an event to the server logs file"""
+    try:
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        with open("server_logs.txt", "a") as f:
+            f.write(f"{timestamp} | {message}\n")
+    except Exception as e:
+        print(f"Error writing to log file: {str(e)}")
 
 def run_crypto_bot():
     global crypto_bot_process, crypto_bot_running, crypto_bot_paused
@@ -224,7 +307,6 @@ def run_crypto_bot():
     
     # Update last started time
     try:
-        import json
         status_data = {}
         if os.path.exists("bot_status.json"):
             with open("bot_status.json", "r") as f:
@@ -240,12 +322,15 @@ def run_crypto_bot():
     # Create a log file for the bot
     log_file = open("bot_logs.txt", "a")
     
+    # Log the start event
+    log_event(f"Crypto bot started with coin={crypto_config['coin']}, risk={crypto_config['risk']}", "positive")
+    
     while crypto_bot_running:
         if not crypto_bot_paused:
             # Use a lightweight approach to run the crypto trading script
             # Redirect output to our log file
             crypto_bot_process = subprocess.Popen(
-                ["python", "7. dip_contra_fees.py", "--coin", "BTC", "--risk", "0.40"],
+                ["python", "7. dip_contra_fees.py", "--coin", crypto_config['coin'], "--risk", str(crypto_config['risk'])],
                 stdout=log_file,
                 stderr=log_file,
                 universal_newlines=True
@@ -265,7 +350,6 @@ def run_stock_bot():
     
     # Update last started time
     try:
-        import json
         status_data = {}
         if os.path.exists("bot_status.json"):
             with open("bot_status.json", "r") as f:
@@ -280,6 +364,9 @@ def run_stock_bot():
     
     # Create a log file for the bot
     log_file = open("stock_bot_logs.txt", "a")
+    
+    # Log the start event
+    log_event(f"Stock bot started with risk={stock_config['risk']}", "positive")
     
     while stock_bot_running:
         if not stock_bot_paused:
@@ -299,25 +386,54 @@ def run_stock_bot():
     log_file.close()
     stock_bot_running = False
 
-# Start the bot automatically when the server starts
-def start_bot_on_startup():
-    thread = threading.Thread(target=run_trading_bot)
-    thread.daemon = True
-    thread.start()
+# Create necessary files if they don't exist
+def initialize_files():
+    # Create bot_status.json if it doesn't exist
+    if not os.path.exists("bot_status.json"):
+        with open("bot_status.json", "w") as f:
+            json.dump({
+                "crypto_last_started": None,
+                "stock_last_started": None
+            }, f)
+    
+    # Create portfolio_data.json if it doesn't exist
+    if not os.path.exists("portfolio_data.json"):
+        with open("portfolio_data.json", "w") as f:
+            json.dump({
+                "cash": 10000.00,
+                "equity": 5000.00,
+                "total_value": 15000.00
+            }, f)
+    
+    # Create trades.json if it doesn't exist
+    if not os.path.exists("trades.json"):
+        with open("trades.json", "w") as f:
+            json.dump([], f)
+    
+    # Create log files if they don't exist
+    for log_file in ["bot_logs.txt", "stock_bot_logs.txt", "server_logs.txt"]:
+        if not os.path.exists(log_file):
+            with open(log_file, "w") as f:
+                f.write(f"Log file created at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     
-    # Start the bot automatically
-    start_bot_on_startup()
+    # Initialize necessary files
+    initialize_files()
+    
+    # Log server start
+    log_event("Server starting up", "positive")
     
     # Check if we're in a production environment
     if os.environ.get("ENVIRONMENT") == "production":
         # Use Waitress for production
         from waitress import serve
         print("Starting production server with Waitress...")
+        log_event("Starting production server with Waitress", "positive")
         serve(app, host="0.0.0.0", port=port, threads=4)
     else:
         # Use Flask's development server for development
         print("Starting development server...")
-        app.run(host="0.0.0.0", port=port)
+        log_event("Starting development server", "positive")
+        app.run(host="0.0.0.0", port=port, debug=True)
